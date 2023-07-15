@@ -1,0 +1,56 @@
+---
+
+- set_fact:
+    file_details: "{{ file_details | default([]) }}"
+    
+- name: Get files 
+  find:
+    paths: "{{ item}}"
+    recurse: yes
+    file_type: file
+    exclude:
+      - "*.gz"
+      - "*.zip"
+      - "*.tar"
+      - "*.rar"
+  register: file_list
+  with_items:
+    - "/home"
+
+- set_fact:
+    file_paths: "{{ file_list.results | map(attribute='files') | flatten | map(attribute='path') }}"
+
+- name: Get file attributes
+  stat:
+    path: "{{ file_path }}"
+    checksum_algorithm: sha256
+  register: file_attrs
+  loop: "{{ file_paths }}"
+  loop_control:
+    loop_var: file_path
+  failed_when: false
+  ignore_errors: yes
+
+- set_fact:
+    file_details: "{{ file_details | list + [
+      {
+      'name' : file.path | basename | default(''),
+      'path' : file.path | default(''),
+      'accessed' : file.atime | default(''),
+      'modified' : file.mtime | default(''),
+      'created' : file.ctime | default(''),
+      'owner' : file.pw_name | default(''),
+      'perm' : file.mode | default(''),
+      'hash_sha256' : file.checksum | default('')
+      }]}}" 
+  loop: "{{ file_attrs.results | map(attribute='stat') }}"
+  loop_control:
+    loop_var: file
+  ignore_errors: yes
+  when: file.checksum is defined
+
+- name: Export file details
+  delegate_to: localhost
+  copy:
+    content: "{{ file_details | to_json | to_nice_json }}"
+    dest: "/tmp/sys_check/files_details-{{ ansible_facts.default_ipv4.address }}.json"
