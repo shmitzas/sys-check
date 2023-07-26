@@ -1,32 +1,26 @@
 ---
-- hosts: to_scan
+- hosts: localhost
+  tasks:
+    - name: Setup result directory
+      file:
+        path: /tmp/sys_check/
+        state: directory
+- hosts: all
   gather_facts: yes
   vars:
     scan_details: []
     result_dir: /tmp/sys_check/
-  tasks:
-    - name: Gather information
-      setup:
-
-    - name: Setup result directory
-      file:
-        path: "{{ result_dir }}"
-        state: directory
-        
+  tasks:        
     - name: Gather Linux machine file info
-      include_tasks: file_scan_linux.yml
+      include_tasks: tasks/file_scan_linux.yml
       register: scan_result
       when: ansible_facts.system == 'Linux'
-
-    - name: Gather Windows machine file info
-      include_tasks: file_scan_win.yml
-      when: ansible_facts.system == 'Windows'
 
     - name: Load file details from JSON to a variable
       set_fact:
         scanned_files: "{{ lookup('file', '{{ result_dir }}files_details-{{ ansible_facts.default_ipv4.address }}.json') | from_json }}"
 
-    - name: Format system scan
+    - name: Format scan results
       set_fact:
         scan_details: "{{ scan_details | list + [
           {

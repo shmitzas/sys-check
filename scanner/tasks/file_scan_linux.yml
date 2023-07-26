@@ -1,0 +1,40 @@
+---
+- name: Get files 
+  find:
+    paths:
+      - /home
+      - /run
+      - /opt
+      - /lib
+      - /lib64
+      - /dev
+      - /etc
+      - /boot
+      - /bin
+      - /sbin
+      - /srv
+      - /var
+      - /root
+    recurse: yes
+    file_type: file
+    exclude:
+      - "*.gz"
+      - "*.zip"
+      - "*.tar"
+      - "*.rar"
+      - "*.mnt"
+  register: file_list
+  become: yes
+
+- name: Gather file info
+  integrity_stats:
+    files: "{{ file_list.files | map(attribute='path') | list }}"
+    checksum: sha1
+  become: yes
+  register: file_details
+
+- name: Export file details
+  delegate_to: localhost
+  copy:
+    content: "{{ file_details.result | to_nice_json }}"
+    dest: "/tmp/sys_check/files_details-{{ ansible_facts.default_ipv4.address }}.json"
