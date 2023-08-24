@@ -3,7 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -13,11 +13,11 @@ import (
 )
 
 const (
-	host     = "127.0.0.1"
-	port     = 5432
-	dbname   = ""
-	user     = ""
-	password = ""
+	host     = "ip"
+	port     = port
+	dbname   = "dbname"
+	user     = "user"
+	password = "password"
 )
 
 func resetNSRLTable(db *sql.DB) {
@@ -78,14 +78,14 @@ func main() {
 	resetNSRLTable(db)
 	counter := 0
 
-	filePath := "data/SanitizedMetadata.tab"
+	filePath := "SanitizedMetadata.tab"
 	file, err := os.Open(filePath)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer file.Close()
 
-	content, err := ioutil.ReadAll(file)
+	content, err := io.ReadAll(file)
 	if err != nil {
 		log.Fatal(err)
 	}
