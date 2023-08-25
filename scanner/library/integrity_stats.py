@@ -9,7 +9,7 @@ import datetime
 import threading
 import queue
 
-def calculate_checksum(file, checksum_algorithm: str ='sha1'):
+def calculate_checksum(file, checksum_algorithm, results_queue):
     hash_algo = hashlib.new(checksum_algorithm)
     try:
         with open(file, 'rb') as f:
@@ -23,7 +23,24 @@ def calculate_checksum(file, checksum_algorithm: str ='sha1'):
                 hash_algo.update(data)
     except:
         return 'Checksum cannot be calculated due to insufficient permissions'
-    return hash_algo.hexdigest()
+    results_queue.put(hash_algo.hexdigest()) 
+
+def calculate_checksums(file):
+    checksum_algorithms = [ 'MD5', 'SHA1', 'SHA256', 'SHA512' ]
+    checksums = []
+    results_queue = queue.Queue()
+    threads = []
+    for algo in checksum_algorithms:
+        thread = threading.Thread(target=calculate_checksum, args=(file, algo, results_queue))
+        threads.append(thread)
+        thread.start()
+
+        for thread in threads:
+            thread.join()
+
+        while not results_queue.empty():
+            checksums.append(results_queue.get())
+    return checksums    
 
 def get_file_details(file):
     full_path = os.path.abspath(file)
@@ -58,28 +75,30 @@ def to_batches(initial_list, batch_size):
         batches.append(batch)
     return batches
 
-def process_batch(batch, checksum, results_queue):
+def process_file(file):
+    if os.path.exists(file) and os.path.isfile(file):
+        file_details = get_file_details(file)
+        checksums = calculate_checksums(file)
+        file_details['MD5'] = checksums[0]
+        file_details['SHA1'] = checksums[1]
+        file_details['SHA256'] = checksums[2]
+        file_details['SHA512'] = checksums[3]
+    return file_details
+
+def process_batch(batch, results_queue):
     result = []
     for file in batch:
-        if os.path.exists(file) and os.path.isfile(file):
-            file_details = get_file_details(file)
-            file_details['checksum'] = calculate_checksum(file, checksum)
-            result.append(file_details)
+        result.append(process_file(file))
     results_queue.put(result)
 
 def main():
     module = AnsibleModule(
         argument_spec=dict(
             files=dict(type='list', required=True),
-            checksum=dict(type='str', required=True)
         )
     )
 
     files = module.params['files']
-    checksum = module.params['checksum']
-
-    if checksum not in hashlib.algorithms_guaranteed:
-        module.fail_json(msg=f"Algorithm '{checksum}' is not supported on this system.")
 
     results = []
     if len(files) > 10000:
@@ -87,7 +106,7 @@ def main():
         results_queue = queue.Queue()
         threads = []
         for batch in batches:
-            thread = threading.Thread(target=process_batch, args=(batch, checksum, results_queue))
+            thread = threading.Thread(target=process_batch, args=(batch, results_queue))
             threads.append(thread)
             thread.start()
 
@@ -98,10 +117,7 @@ def main():
             results.extend(results_queue.get())
     else:
         for file in files:
-            if os.path.exists(file) and os.path.isfile(file):
-                file_details = get_file_details(file)
-                file_details['checksum'] = calculate_checksum(file, checksum)
-                results.append(file_details)
+            results.append(process_file(file))
 
     module.exit_json(changed=False, result=results)
 
