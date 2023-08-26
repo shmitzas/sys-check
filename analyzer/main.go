@@ -11,15 +11,18 @@ import (
 )
 
 type ScannedFiles struct {
+	Name     string `json:"name"`
+	Path     string `json:"path"`
+	Owner    string `json:"owner"`
+	Perm     string `json:"perm"`
 	Accessed string `json:"accessed"`
-	Checksum string `json:"checksum"`
 	Created  string `json:"created"`
 	Group    string `json:"group"`
 	Modified string `json:"modified"`
-	Name     string `json:"name"`
-	Owner    string `json:"owner"`
-	Path     string `json:"path"`
-	Perm     string `json:"perm"`
+	MD5      string `json:"MD5"`
+	SHA1     string `json:"SHA1"`
+	SHA256   string `json:"SHA256"`
+	SHA512   string `json:"SHA512"`
 }
 
 type Scan struct {
@@ -72,14 +75,16 @@ const (
 )
 
 func readJson() (*Scan, error) {
-    //This is hardcoded only for testing purposes and is temporary
-	data, err := os.ReadFile("/tmp/sys_check/results/scans/scan.json")
+	// Read the JSON data from the file
+	data, err := os.ReadFile("/tmp/sys_check/results/scans/192.168.136.134.json")
 	if err != nil {
 		return nil, fmt.Errorf("error reading file: %v", err)
 	}
 
+	// Create a variable to store the decoded JSON data
 	var scan []Scan
 
+	// Decode the JSON data into the variable
 	err = json.Unmarshal(data, &scan)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding JSON: %v", err)
@@ -94,7 +99,7 @@ func compareHashes(scanData Scan, db *sql.DB) (*[]ScannedFiles, *[]ScannedFiles)
 	for i := 0; i < len(scanData.Files); i++ {
 		query := "SELECT EXISTS(SELECT 1 FROM nsrl_files WHERE sha1 = $1);"
 		var exists bool
-		err := db.QueryRow(query, scanData.Files[i].Checksum).Scan(&exists)
+		err := db.QueryRow(query, scanData.Files[i].SHA1).Scan(&exists)
 
 		if err != nil {
 			log.Fatal(err)
@@ -119,13 +124,18 @@ func prepareReport(scanData Scan, validFiles []ScannedFiles, invalidFiles []Scan
 		ValidFiles:   validFiles,
 		InvalidFiles: invalidFiles,
 	}
+	// Open the file for writing
 	file, err := os.Create("report-" + scanData.IPv4Details.Address + ".json")
 	if err != nil {
 		fmt.Println("Error creating file:", err)
 		return
 	}
 	defer file.Close()
+
+	// Create a JSON encoder
 	encoder := json.NewEncoder(file)
+
+	// Write the ScanData struct to the file
 	err = encoder.Encode(reportData)
 	if err != nil {
 		fmt.Println("Error encoding JSON:", err)
