@@ -6,32 +6,23 @@ import (
 	"io"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/joho/godotenv"
+	_ "github.com/joho/godotenv"
 	_ "github.com/lib/pq"
-)
-
-const (
-	host     = "ip"
-	port     = port
-	dbname   = "dbname"
-	user     = "user"
-	password = "password"
 )
 
 func resetNSRLTable(db *sql.DB) {
 	_, err := db.Exec(`
-		DROP TABLE IF EXISTS nsrl_files;
-	`)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	_, err = db.Exec(`
-		CREATE TABLE nsrl_files (
+		CREATE TABLE IF NOT EXISTS nsrl_files (
 			id SERIAL PRIMARY KEY,
-			sha1 VARCHAR(40),
+			sha1 VARCHAR(40) UNIQUE,
+			md5 VARCHAR(32) UNIQUE,
+			sha256 VARCHAR(64) UNIQUE,
+			sha512 VARCHAR(128) UNIQUE,
 			filesize VARCHAR(128),
 			filepath VARCHAR(512)
 		);
@@ -53,7 +44,8 @@ func processChunk(chunk [][]string, db *sql.DB, counter int) int {
 
 		_, err := db.Exec(`
 			INSERT INTO nsrl_files (sha1, filesize, filepath)
-			VALUES ($1, $2, $3);
+			VALUES ($1, $2, $3)
+			ON CONFLICT (sha1) DO NOTHING;
 		`, row[1], row[2], row[3])
 		if err != nil {
 			log.Println(err)
@@ -63,6 +55,24 @@ func processChunk(chunk [][]string, db *sql.DB, counter int) int {
 	return counter
 }
 func main() {
+	if len(os.Args) < 2 {
+		fmt.Println("Please provide a full path to data file.")
+		return
+	}
+
+	filePath := os.Args[1]
+
+	err := godotenv.Load("../.env")
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	host := os.Getenv("DB_HOST")
+	port, _ := strconv.Atoi(os.Getenv("DB_PORT"))
+	dbname := os.Getenv("DB_NAME")
+	user := os.Getenv("DB_USER")
+	password := os.Getenv("DB_PASSWORD")
+
 	psqlInfo := fmt.Sprintf("host=%s port=%d dbname=%s user=%s password=%s sslmode=disable",
 		host, port, dbname, user, password)
 	db, err := sql.Open("postgres", psqlInfo)
@@ -78,7 +88,6 @@ func main() {
 	resetNSRLTable(db)
 	counter := 0
 
-	filePath := "SanitizedMetadata.tab"
 	file, err := os.Open(filePath)
 	if err != nil {
 		log.Fatal(err)
