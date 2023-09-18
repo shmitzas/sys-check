@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
@@ -65,14 +67,6 @@ type Report struct {
 	Kernel string `json:"kernel"`
 	OS     string `json:"os"`
 }
-
-const (
-	host     = "ip"
-	port     = port
-	dbname   = "dbname"
-	user     = "user"
-	password = "password"
-)
 
 func readJson() (*Scan, error) {
 	// Read the JSON data from the file
@@ -144,6 +138,17 @@ func prepareReport(scanData Scan, validFiles []ScannedFiles, invalidFiles []Scan
 }
 
 func main() {
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	host := os.Getenv("DB_HOST")
+	port, _ := strconv.Atoi(os.Getenv("DB_PORT"))
+	dbname := os.Getenv("DB_NAME")
+	user := os.Getenv("DB_USER")
+	password := os.Getenv("DB_PASSWORD")
+
 	psqlInfo := fmt.Sprintf("host=%s port=%d dbname=%s user=%s password=%s sslmode=disable",
 		host, port, dbname, user, password)
 	db, err := sql.Open("postgres", psqlInfo)
