@@ -11,7 +11,6 @@ import (
 	"sync"
 
 	"github.com/joho/godotenv"
-	_ "github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
@@ -121,7 +120,10 @@ func main() {
 	wg.Wait()
 
 	_, err = db.Exec(`
-        CREATE INDEX nsrl_files_sha1 ON nsrl_files(sha1);
+		CREATE INDEX nsrl_files_md5 ON nsrl_files(md5);
+		CREATE INDEX nsrl_files_sha1 ON nsrl_files(sha1);
+		CREATE INDEX nsrl_files_sha256 ON nsrl_files(sha256);
+		CREATE INDEX nsrl_files_sha512 ON nsrl_files(sha512);
     `)
 	if err != nil {
 		log.Fatal(err)
