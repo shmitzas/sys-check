@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -70,7 +71,13 @@ type Report struct {
 
 func readJson() (*Scan, error) {
 	// Read the JSON data from the file
-	data, err := os.ReadFile("/tmp/sys_check/results/scans/192.168.136.134.json")
+	if len(os.Args) < 2 {
+		return nil, fmt.Errorf("please provide a full path to data file")
+	}
+
+	filePath := os.Args[1]
+
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("error reading file: %v", err)
 	}
@@ -119,7 +126,11 @@ func prepareReport(scanData Scan, validFiles []ScannedFiles, invalidFiles []Scan
 		InvalidFiles: invalidFiles,
 	}
 	// Open the file for writing
-	file, err := os.Create("report-" + scanData.IPv4Details.Address + ".json")
+	timestamp := time.Now().Format("2006-01-02.15.04.05") // Format the current time as "YYYY-MM-DD.HH.mm.ss"
+
+	// Construct the filename with the timestamp
+	filename := fmt.Sprintf("/tmp/sys_check/results/report-%s-%s.json", scanData.IPv4Details.Address, timestamp)
+	file, err := os.Create(filename)
 	if err != nil {
 		fmt.Println("Error creating file:", err)
 		return
