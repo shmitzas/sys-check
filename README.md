@@ -25,7 +25,7 @@
         - ansible_become_password=*(ansible_ssh_user's sudo password)*
     - Windows
         - TBA
-<br>**Steps 3-5 are optional if you already have uploaded NIST NSRL Unique File Corpus data to a Postgres database**
+**Steps 3-5 are optional if you already have uploaded NIST NSRL Unique File Corpus data to a Postgres database**
 3. Download [NIST NSRL Unique File Corpus data file](https://s3.amazonaws.com/docs.nsrl.nist.gov/morealgs/corpus/CorpIdMetadata.tab.zip) and extract it
 4. Navigate to `Analyzer -> Pyhton scripts` and launch `ensure_utf8.py` to format NIST NSRL Unique File Corpus data file
     <br>```python3 ensure_utf8.py <CorpIdMetadata.tab file path> <output file name>```
