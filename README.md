@@ -1,9 +1,9 @@
 # sys-check
 
-## How to update NIST NSRL data set
-1. Run NIST NSRL data file checks
+## How to update NIST NSRL Uniqe File Corpus data set
+1. Run NIST NSRL Uniqe File Corpus data file re-formatting
     - ```python3 ensure_utf8.py <input file> <output file>```
-2. Reset databse to use new data
+2. Upload NIST NSRL Uniqe File Corpus data file to a Postgres database
     - ```go run nsrl_to_db.go <formatted data file path>```
     - **Note that this process takes up to a few hours**
 
