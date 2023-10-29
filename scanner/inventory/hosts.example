@@ -1,0 +1,2 @@
+[groupname]
+hostname <ip> ansible_ssh_user=<user> ansible_password=<password> ansible_become=true ansible_become_method=sudo ansible_become_password=<sudo password> 

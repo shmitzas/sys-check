@@ -1,0 +1,173 @@
+package main
+
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"log"
+	"math/rand"
+	"os"
+	"strconv"
+	"time"
+
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
+)
+
+type ScannedFiles struct {
+	Name     string `json:"name"`
+	Path     string `json:"path"`
+	Owner    string `json:"owner"`
+	Perm     string `json:"perm"`
+	Accessed string `json:"accessed"`
+	Created  string `json:"created"`
+	Group    string `json:"group"`
+	Modified string `json:"modified"`
+	MD5      string `json:"MD5"`
+	SHA1     string `json:"SHA1"`
+	SHA256   string `json:"SHA256"`
+	SHA512   string `json:"SHA512"`
+}
+
+type ScanRequest struct {
+	Files       []ScannedFiles `json:"files"`
+	IPv4Address string         `json:"ipv4"`
+}
+
+// type Report struct {
+// 	Architecture string         `json:"architecture"`
+// 	ValidFiles   []ScannedFiles `json:"validFiles"`
+// 	InvalidFiles []ScannedFiles `json:"invalidFiles"`
+// 	IPv4Details  struct {
+// 		Address    string `json:"address"`
+// 		Alias      string `json:"alias"`
+// 		Broadcast  string `json:"broadcast"`
+// 		Gateway    string `json:"gateway"`
+// 		Interface  string `json:"interface"`
+// 		MacAddress string `json:"macaddress"`
+// 		MTU        int    `json:"mtu"`
+// 		Netmask    string `json:"netmask"`
+// 		Network    string `json:"network"`
+// 		Prefix     string `json:"prefix"`
+// 		Type       string `json:"type"`
+// 	} `json:"ipv4_details"`
+// 	Kernel string `json:"kernel"`
+// 	OS     string `json:"os"`
+// }
+
+// func compareHashes(scanData ScanRequest, db *sql.DB) (*[]ScannedFiles, *[]ScannedFiles) {
+// 	var validFiles []ScannedFiles
+// 	var invalidFiles []ScannedFiles
+// 	for i := 0; i < len(scanData.Files); i++ {
+// 		query := "SELECT EXISTS(SELECT 1 FROM nsrl_files WHERE sha1 = $1);"
+// 		var exists bool
+// 		err := db.QueryRow(query, scanData.Files[i].SHA1).Scan(&exists)
+
+// 		if err != nil {
+// 			log.Fatal(err)
+// 		}
+
+// 		if exists {
+// 			validFiles = append(validFiles, scanData.Files[i])
+// 		} else {
+// 			// if scanData.Files[i].SHA1 == "21f9cbe0349d233ef6f5d9270fcdb07686693e8b" {
+// 			// 	_, err := db.Exec(`
+// 			// 		INSERT INTO nsrl_files (sha1, filesize, filepath)
+// 			// 		VALUES ($1, $2, $3);
+// 			// 	`, scanData.Files[i].SHA1, 464645, scanData.Files[i].Path)
+// 			// 	if err != nil {
+// 			// 		log.Println(err)
+// 			// 		continue
+// 			// 	}
+// 			// }
+// 			invalidFiles = append(invalidFiles, scanData.Files[i])
+// 		}
+// 		progress := float64(i+1) / float64(len(scanData.Files)) * 100
+// 		fmt.Printf("Processing: %.2f%%\r", progress)
+// 	}
+// 	return &validFiles, &invalidFiles
+// }
+
+// func prepareReport(scanData Scan, validFiles []ScannedFiles, invalidFiles []ScannedFiles) {
+// 	reportData := Report{
+// 		Architecture: scanData.Architecture,
+// 		Kernel:       scanData.Kernel,
+// 		OS:           scanData.OS,
+// 		IPv4Details:  scanData.IPv4Details,
+// 		ValidFiles:   validFiles,
+// 		InvalidFiles: invalidFiles,
+// 	}
+// 	// Open the file for writing
+// 	file, err := os.Create("report-" + scanData.IPv4Details.Address + ".json")
+// 	if err != nil {
+// 		fmt.Println("Error creating file:", err)
+// 		return
+// 	}
+// 	defer file.Close()
+
+// 	// Create a JSON encoder
+// 	encoder := json.NewEncoder(file)
+
+// 	// Write the ScanData struct to the file
+// 	err = encoder.Encode(reportData)
+// 	if err != nil {
+// 		fmt.Println("Error encoding JSON:", err)
+// 		return
+// 	}
+// }
+
+func main() {
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	host := os.Getenv("DB_HOST")
+	port, _ := strconv.Atoi(os.Getenv("DB_PORT"))
+	dbname := os.Getenv("DB_NAME")
+	user := os.Getenv("DB_USER")
+	password := os.Getenv("DB_PASSWORD")
+
+	// Creates connection with the database
+	psqlInfo := fmt.Sprintf("host=%s port=%d dbname=%s user=%s password=%s sslmode=disable",
+		host, port, dbname, user, password)
+	db, err := sql.Open("postgres", psqlInfo)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	if err := db.Ping(); err != nil {
+		log.Fatal(err)
+	}
+
+	// Parses json data and writes it to scanData var
+	var scanData ScanRequest
+	err = json.NewDecoder(os.Stdin).Decode(&scanData)
+	if err != nil {
+		log.Fatal("Failed to decode JSON data:", err)
+	}
+
+	/////////////////////////////
+	// For debuging --- REMOVE //
+	rand.Seed(time.Now().UnixNano())
+	randomNum := rand.Intn(10000)
+	filename := fmt.Sprintf("/home/netsec/Desktop/praktika/service/analyzer/output_%d.json", randomNum)
+	file, err := os.Create(filename)
+	if err != nil {
+		log.Fatal("Failed to create output file:", err)
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	err = encoder.Encode(scanData)
+	if err != nil {
+		log.Fatal("Failed to write JSON content to file:", err)
+	}
+	// For debuging --- REMOVE //
+	/////////////////////////////
+
+	// process data
+	// validFiles, invalidFiles := compareHashes(*scanData, db)
+	// prepareReport(*scanData, *validFiles, *invalidFiles)
+}

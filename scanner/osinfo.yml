@@ -1,39 +1,17 @@
 ---
 - hosts: localhost
   tasks:
-    - name: Setup result directory
+    - name: Setup scans result directory
       file:
-        path: /tmp/sys_check/
+        path: /tmp/sys_check/results/scans
         state: directory
+
 - hosts: all
   gather_facts: yes
   vars:
-    scan_details: []
-    result_dir: /tmp/sys_check/
-  tasks:        
+    result_dir: /tmp/sys_check/results
+  tasks:
     - name: Gather Linux machine file info
       include_tasks: tasks/file_scan_linux.yml
       register: scan_result
       when: ansible_facts.system == 'Linux'
-
-    - name: Load file details from JSON to a variable
-      set_fact:
-        scanned_files: "{{ lookup('file', '{{ result_dir }}files_details-{{ ansible_facts.default_ipv4.address }}-{{ ansible_date_time.date }}.{{ ansible_date_time.hour }}.{{ ansible_date_time.minute }}.{{ ansible_date_time.second }}.json') | from_json }}"
-
-    - name: Format scan results
-      set_fact:
-        scan_details: "{{ scan_details | list + [
-          {
-          'os' : ansible_facts.system,
-          'kernel' : ansible_facts.kernel,
-          'architecture' : ansible_facts.architecture,
-          'ipv4_details' : ansible_facts.default_ipv4,
-          'files' : scanned_files
-          }]}}"
-
-    - name: Save scan results to JSON
-      delegate_to: localhost
-      lineinfile:
-        line: "{{ scan_details | to_nice_json }}"
-        path: "{{ result_dir }}scan-{{ scan_details[0].ipv4_details.address }}.json"
-        create: true

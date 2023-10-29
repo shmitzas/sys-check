@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+import json
+import socket
 from ansible.module_utils.basic import AnsibleModule
 import hashlib
 import os
@@ -8,6 +10,22 @@ import grp
 import datetime
 import threading
 import queue
+from dotenv import load_dotenv
+import requests
+
+def get_file_paths(directory):
+    file_paths = []
+    excluded_extensions = ['tar', 'zip', 'rar', '.gz']
+    
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            file_path = os.path.join(root, file)
+            file_extension = os.path.splitext(file_path)[1].lower()
+            
+            if file_extension not in excluded_extensions:
+                file_paths.append(file_path)
+    
+    return file_paths
 
 def calculate_checksum(file, checksum_algorithm, results_queue):
     hash_algo = hashlib.new(checksum_algorithm)
@@ -40,7 +58,7 @@ def calculate_checksums(file):
 
         while not results_queue.empty():
             checksums.append(results_queue.get())
-    return checksums    
+    return checksums   
 
 def get_file_details(file):
     full_path = os.path.abspath(file)
@@ -55,6 +73,7 @@ def get_file_details(file):
     owner = pwd.getpwuid(file_stat.st_uid).pw_name
     group = grp.getgrgid(file_stat.st_gid).gr_name
     permissions = oct(file_stat.st_mode)[-3:]
+    size = os.path.getsize(full_path)
     
     file_details = {
         "path": full_path,
@@ -65,6 +84,7 @@ def get_file_details(file):
         "owner": owner,
         "group": group,
         "perm": permissions,
+        "size": size
     }
     return file_details
 
@@ -83,26 +103,51 @@ def process_file(file):
         file_details['SHA1'] = checksums[1]
         file_details['SHA256'] = checksums[2]
         file_details['SHA512'] = checksums[3]
-    return file_details
+        return file_details
+    return None
 
 def process_batch(batch, results_queue):
     result = []
     for file in batch:
-        result.append(process_file(file))
+        processed_file = process_file(file)
+        if processed_file != None:
+            result.append(processed_file)
     results_queue.put(result)
 
-def main():
-    module = AnsibleModule(
-        argument_spec=dict(
-            files=dict(type='list', required=True),
-        )
-    )
+def get_ipv4_address():
+    hostname = socket.gethostname()
+    ip_address = socket.gethostbyname(hostname)
+    return ip_address
 
-    files = module.params['files']
+def check_files_integrity(file_list):
+    payload_data = {}
+    payload_data['files'] = file_list
+    payload_data['ipv4'] = get_ipv4_address()
+    payload_data['status'] = 'processing'
+
+def send_integrity_request(payload):
+    port = int(os.getenv('PORT', '8000'))
+    host = os.getenv('HOST', '127.0.0.1')
+    url = f'http://{host}:{port}'
+
+    json_payload = json.dumps(payload)
+    headers = {'Content-Type': 'application/json'}
+    response = requests.post(url, data=json_payload, headers=headers)
+
+    if response.status_code == 200:
+        response_data = response.json()
+        print(response_data)
+    else:
+        # Request failed
+        print('Request failed:', response.status_code)
+
+def process_dir(directory):
+    batch_limit = 10000
+    file_paths = get_file_paths(directory)
 
     results = []
-    if len(files) > 10000:
-        batches = to_batches(files, 10000)
+    if len(file_paths) > batch_limit:
+        batches = to_batches(file_paths, batch_limit)
         results_queue = queue.Queue()
         threads = []
         for batch in batches:
@@ -116,10 +161,43 @@ def main():
         while not results_queue.empty():
             results.extend(results_queue.get())
     else:
-        for file in files:
-            results.append(process_file(file))
+        for file in file_paths:
+            processed_file = process_file(file)
+            if processed_file != None:
+                results.append(processed_file)
 
-    module.exit_json(changed=False, result=results)
+    if len(results) > 1:
+        check_files_integrity(results)
+
+
+def main():
+    module = AnsibleModule(
+        argument_spec=dict(
+            dirs=dict(type='list', required=True),
+        )
+    )
+    dirs = module.params['dirs']
+
+    threads = []
+    for dir in dirs:
+        thread = threading.Thread(target=process_dir, args=(dir))
+        threads.append(thread)
+        thread.start()
+
+    for thread in threads:
+        thread.join()
+
+
+    # Sends a signal indicating that all data was sent out
+    payload_data = {}
+    payload_data['files'] = []
+    payload_data['ipv4'] = get_ipv4_address()
+    payload_data['status'] = 'final'
+
+    send_integrity_request(payload_data)
+
+    module.exit_json(changed=False)
 
 if __name__ == '__main__':
+    load_dotenv()
     main()

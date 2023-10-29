@@ -1,0 +1,32 @@
+DROP DATABASE IF EXISTS <database_name>;
+CREATE DATABASE <database_name>;
+
+CREATE TABLE IF NOT EXISTS <database_name>.nist (
+    id SERIAL PRIMARY KEY,
+    sha1 VARCHAR(40) UNIQUE,
+    md5 VARCHAR(32) UNIQUE,
+    sha256 VARCHAR(64) UNIQUE,
+    sha512 VARCHAR(128) UNIQUE,
+    filesize VARCHAR(128),
+    filepath VARCHAR(512)
+);
+
+CREATE TABLE IF NOT EXISTS <database_name>.verified (
+    id SERIAL PRIMARY KEY,
+    sha1 VARCHAR(40) UNIQUE,
+    md5 VARCHAR(32) UNIQUE,
+    sha256 VARCHAR(64) UNIQUE,
+    sha512 VARCHAR(128) UNIQUE,
+    filesize VARCHAR(128),
+    filepath VARCHAR(512)
+);
+
+CREATE TABLE IF NOT EXISTS <database_name>.candidates (
+    id SERIAL PRIMARY KEY,
+    sha1 VARCHAR(40) UNIQUE,
+    md5 VARCHAR(32) UNIQUE,
+    sha256 VARCHAR(64) UNIQUE,
+    sha512 VARCHAR(128) UNIQUE,
+    filesize VARCHAR(128),
+    filepath VARCHAR(512)
+);
