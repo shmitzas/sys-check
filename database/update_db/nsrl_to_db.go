@@ -13,23 +13,6 @@ import (
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
-
-func resetNSRLTable(db *sql.DB) {
-	_, err := db.Exec(`
-		CREATE TABLE IF NOT EXISTS nsrl_files (
-			id SERIAL PRIMARY KEY,
-			sha1 VARCHAR(40) UNIQUE,
-			md5 VARCHAR(32) UNIQUE,
-			sha256 VARCHAR(64) UNIQUE,
-			sha512 VARCHAR(128) UNIQUE,
-			filesize VARCHAR(128),
-			filepath VARCHAR(512)
-		);
-	`)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
 func processChunk(chunk [][]string, db *sql.DB, counter int) int {
 	chunkLength := len(chunk)
 	for _, row := range chunk {
@@ -83,8 +66,6 @@ func main() {
 	if err := db.Ping(); err != nil {
 		log.Fatal(err)
 	}
-
-	resetNSRLTable(db)
 	counter := 0
 
 	file, err := os.Open(filePath)
