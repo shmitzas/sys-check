@@ -170,6 +170,11 @@ func indexTables(db *sql.DB) {
 		CREATE INDEX candidates_sha1 ON candidates(sha1);
 		CREATE INDEX candidates_sha256 ON candidates(sha256);
 		CREATE INDEX candidates_sha512 ON candidates(sha512);
+
+		CREATE INDEX malicious_md5 ON malicious(md5);
+		CREATE INDEX malicious_sha1 ON malicious(sha1);
+		CREATE INDEX malicious_sha256 ON malicious(sha256);
+		CREATE INDEX malicious_sha512 ON malicious(sha512);
     `)
 	if err != nil {
 		log.Fatal(err)
@@ -213,25 +218,6 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to decode JSON data:", err)
 	}
-
-	/////////////////////////////
-	// For debuging --- REMOVE //
-	rand.Seed(time.Now().UnixNano())
-	randomNum := rand.Intn(10000)
-	filename := fmt.Sprintf("/home/netsec/Desktop/praktika/service/analyzer/output_%d.json", randomNum)
-	file, err := os.Create(filename)
-	if err != nil {
-		log.Fatal("Failed to create output file:", err)
-	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	err = encoder.Encode(scanData)
-	if err != nil {
-		log.Fatal("Failed to write JSON content to file:", err)
-	}
-	// For debuging --- REMOVE //
-	/////////////////////////////
 
 	// process data
 
