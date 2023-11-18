@@ -30,7 +30,7 @@
 4. Navigate to `Analyzer -> Pyhton scripts` and launch `ensure_utf8.py` to format NIST NSRL Unique File Corpus data file
     <br>```python3 ensure_utf8.py <CorpIdMetadata.tab file path> <output file name>```
 5. Navigate to `Analyzer -> data` and run `nsrl_to_db.go` to upload formatted NIST NSRL Unique File Corpus data to a Postgres database
-    <br>```go run nsrl_to_db.go <formatted CorpIdMetadata.tab data file path>```
+    <br>```./update_db <formatted CorpIdMetadata.tab data file path>```
 6. Launch "Scanner" ansible playbook by navigating to `Scanner` and launching `osinfo.yml` playbook
     <br>```ansible-playbook osinfo.yml -i inventory/hosts```
 7. After it is done launch analyzer script by navigating to `Analyzer` and launching `analyzer` program
