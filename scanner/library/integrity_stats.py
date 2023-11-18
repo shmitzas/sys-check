@@ -55,6 +55,7 @@ def get_file_details(file):
     owner = pwd.getpwuid(file_stat.st_uid).pw_name
     group = grp.getgrgid(file_stat.st_gid).gr_name
     permissions = oct(file_stat.st_mode)[-3:]
+    size = os.path.getsize(full_path)
     
     file_details = {
         "path": full_path,
@@ -65,6 +66,7 @@ def get_file_details(file):
         "owner": owner,
         "group": group,
         "perm": permissions,
+        "size": size
     }
     return file_details
 
