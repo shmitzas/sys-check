@@ -5,10 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math/rand"
 	"os"
+	"regexp"
 	"strconv"
-	"time"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -30,159 +29,156 @@ type ScannedFiles struct {
 	SHA512   string `json:"SHA512"`
 }
 
-type ScanRequest struct {
-	Files       []ScannedFiles `json:"files"`
-	IPv4Address string         `json:"ipv4"`
+type Metadata struct {
+	IPv4Address string `json:"ipv4"`
+	Hostname    string `json:"hostname"`
 }
 
-func checkHashes(files *[]ScannedFiles, db *sql.DB) (*[]ScannedFiles, *[]ScannedFiles, error) {
-	var validFiles []ScannedFiles
-	var invalidFiles []ScannedFiles
+type ScanRequest struct {
+	Files    []ScannedFiles `json:"files"`
+	Metadata Metadata       `json:"metadata"`
+	Status   string         `json:"status"`
+}
 
-	// Prepare the SQL statement for querying the database
+type Report struct {
+	Metadata       Metadata       `json:"metadata"`
+	VerifiedFiles  []ScannedFiles `json:"verifiedFiles"`
+	CandidateFiles []ScannedFiles `json:"candidateFiles"`
+	MaliciousFiles []ScannedFiles `json:"maliciousFiles"`
+	MaliciousVars  []string       `json:"maliciousVariables"`
+}
+
+func checkHashes(files *[]ScannedFiles, db *sql.DB) (*[]ScannedFiles, *[]ScannedFiles, *[]ScannedFiles, error) {
+	var verifiedFiles []ScannedFiles
+	var maliciousFiles []ScannedFiles
+	var candidateFiles []ScannedFiles
+
+	for _, file := range *files {
+
+		if checkIfFileExists(&file, db, "verified") {
+			verifiedFiles = append(verifiedFiles, file)
+		}
+
+		if checkIfFileExists(&file, db, "malicious") {
+			maliciousFiles = append(maliciousFiles, file)
+		}
+
+		if checkIfFileExists(&file, db, "candidates") {
+			candidateFiles = append(candidateFiles, file)
+		} else {
+			err := insertNewFileData(&file, db)
+			if err != nil {
+				log.Println(err)
+			}
+		}
+	}
+
+	return &verifiedFiles, &maliciousFiles, &candidateFiles, nil
+}
+
+func checkIfFileExists(file *ScannedFiles, db *sql.DB, tableName string) bool {
+	// Checking VERIFIED files table
 	stmt, err := db.Prepare(`
 		SELECT MD5, SHA1, SHA256, SHA512
-		FROM (
-			SELECT MD5, SHA1, SHA256, SHA512 FROM nist
-			UNION ALL
-			SELECT MD5, SHA1, SHA256, SHA512 FROM verified
-		) AS t
+		FROM ` + tableName + `
 		WHERE MD5 = $1 OR SHA1 = $2 OR SHA256 = $3 OR SHA512 = $4
 	`)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to prepare SQL statement: %v", err)
+		return false
 	}
 
-	// Prepare the SQL statement for checking if an identical entry exists in the "candidates" table
-	checkStmt, err := db.Prepare(`
-		SELECT COUNT(*) FROM candidates
-		WHERE MD5 = $1 AND SHA1 = $2 AND SHA256 = $3 AND SHA512 = $4
-	`)
+	rows, err := stmt.Query(file.MD5, file.SHA1, file.SHA256, file.SHA512)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to prepare SQL statement: %v", err)
+		return false
 	}
 
-	for _, file := range *files {
-		// Execute the SQL statement with the hash values from the file
-		rows, err := stmt.Query(file.MD5, file.SHA1, file.SHA256, file.SHA512)
+	var existingHashes []ScannedFiles
+	for rows.Next() {
+		var scannedFile ScannedFiles
+		err := rows.Scan(
+			&scannedFile.MD5,
+			&scannedFile.SHA1,
+			&scannedFile.SHA256,
+			&scannedFile.SHA512,
+		)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to query database: %v", err)
+			return false
+		}
+		existingHashes = append(existingHashes, scannedFile)
+	}
+	rows.Close()
+
+	if len(existingHashes) > 0 {
+		var result = existingHashes[0]
+		// Update the entry with all hash values if the respective hash value is empty
+		if result.MD5 == "" && file.MD5 != "" {
+			result.MD5 = file.MD5
+		}
+		if result.SHA1 == "" && file.SHA1 != "" {
+			result.SHA1 = file.SHA1
+		}
+		if result.SHA256 == "" && file.SHA256 != "" {
+			result.SHA256 = file.SHA256
+		}
+		if result.SHA512 == "" && file.SHA512 != "" {
+			result.SHA512 = file.SHA512
 		}
 
-		var existingHashes []ScannedFiles
-		for rows.Next() {
-			var scannedFile ScannedFiles
-			err := rows.Scan(
-				&scannedFile.MD5,
-				&scannedFile.SHA1,
-				&scannedFile.SHA256,
-				&scannedFile.SHA512,
-			)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to scan row: %v", err)
-			}
-			existingHashes = append(existingHashes, scannedFile)
-		}
-		rows.Close()
-
-		if len(existingHashes) > 0 {
-			// At least one hash exists in the database, update the entries with all hash values
-			for _, existingFile := range existingHashes {
-				// Update the entry with all hash values if the respective hash value is empty
-				if existingFile.MD5 == "" && file.MD5 != "" {
-					existingFile.MD5 = file.MD5
-				}
-				if existingFile.SHA1 == "" && file.SHA1 != "" {
-					existingFile.SHA1 = file.SHA1
-				}
-				if existingFile.SHA256 == "" && file.SHA256 != "" {
-					existingFile.SHA256 = file.SHA256
-				}
-				if existingFile.SHA512 == "" && file.SHA512 != "" {
-					existingFile.SHA512 = file.SHA512
-				}
-
-				// Update the entry in the nist table with the updated hash values
-				_, err = db.Exec(`
-					UPDATE nist
-					SET MD5 = $1, SHA1 = $2, SHA256 = $3, SHA512 = $4
-					WHERE Name = $5
-				`, existingFile.MD5, existingFile.SHA1, existingFile.SHA256, existingFile.SHA512, existingFile.Name)
-				if err != nil {
-					return nil, nil, fmt.Errorf("failed to update nist table: %v", err)
-				}
-
-				// Update the entry in the verified table with the updated hash values
-				_, err = db.Exec(`
-					UPDATE verified
-					SET MD5 = $1, SHA1 = $2, SHA256 = $3, SHA512 = $4
-					WHERE Name = $5
-				`, existingFile.MD5, existingFile.SHA1, existingFile.SHA256, existingFile.SHA512, existingFile.Name)
-				if err != nil {
-					return nil, nil, fmt.Errorf("failed to update verified table: %v", err)
-				}
-
-				// Add the updated file to the validFiles list
-				validFiles = append(validFiles, existingFile)
-			}
-		} else {
-			// No hashes from the file exist in the database, check if an identical entry exists in the "candidates" table
-			var count int
-			err = checkStmt.QueryRow(file.MD5, file.SHA1, file.SHA256, file.SHA512).Scan(&count)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to query database: %v", err)
-			}
-
-			if count == 0 {
-				// No identical entry exists in the "candidates" table, add the file to the table
-				_, err = db.Exec(`
-					INSERT INTO candidates (MD5, SHA1, SHA256, SHA512, filesize, filepath)
-					VALUES ($1, $2, $3, $4, $5)
-				`, file.MD5, file.SHA1, file.SHA256, file.SHA512, file.Size, file.Path)
-				if err != nil {
-					return nil, nil, fmt.Errorf("failed to insert into candidates table: %v", err)
-				}
-			}
-
-			// Add the file to the invalidFiles list
-			invalidFiles = append(invalidFiles, file)
+		// Update the entry in the files table with the updated hash values
+		_, err = db.Exec(`
+			UPDATE files
+			SET MD5 = $1, SHA1 = $2, SHA256 = $3, SHA512 = $4
+			WHERE Name = $5
+		`, result.MD5, result.SHA1, result.SHA256, result.SHA512, result.Name)
+		if err != nil {
+			return true
 		}
 	}
-	// Index tables
-	indexTables(db)
-
-	return &validFiles, &invalidFiles, nil
+	return false
 }
 
-func indexTables(db *sql.DB) {
+func insertNewFileData(file *ScannedFiles, db *sql.DB) error {
 	_, err := db.Exec(`
-		CREATE INDEX nsrl_md5 ON nsrl(md5);
-		CREATE INDEX nsrl_sha1 ON nsrl(sha1);
-		CREATE INDEX nsrl_sha256 ON nsrl(sha256);
-		CREATE INDEX nsrl_sha512 ON nsrl(sha512);
-
-		CREATE INDEX verified_md5 ON verified(md5);
-		CREATE INDEX verified_sha1 ON verified(sha1);
-		CREATE INDEX verified_sha256 ON verified(sha256);
-		CREATE INDEX verified_sha512 ON verified(sha512);
-
-		CREATE INDEX candidates_md5 ON candidates(md5);
-		CREATE INDEX candidates_sha1 ON candidates(sha1);
-		CREATE INDEX candidates_sha256 ON candidates(sha256);
-		CREATE INDEX candidates_sha512 ON candidates(sha512);
-
-		CREATE INDEX malicious_md5 ON malicious(md5);
-		CREATE INDEX malicious_sha1 ON malicious(sha1);
-		CREATE INDEX malicious_sha256 ON malicious(sha256);
-		CREATE INDEX malicious_sha512 ON malicious(sha512);
-    `)
+		INSERT INTO files (MD5, SHA1, SHA256, SHA512, filesize, filepath, status)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, file.MD5, file.SHA1, file.SHA256, file.SHA512, file.Size, file.Path, "candidate")
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("failed to insert new file data into files table: %v", err)
 	}
+	return nil
 }
 
-func prepareReport(scanData *ScanRequest, validFiles *[]ScannedFiles, invalidFiles *[]ScannedFiles) {
-	// does some stuff
+func prepareReport(scanMetadata *Metadata, verifiedFiles *[]ScannedFiles, maliciousFiles *[]ScannedFiles, candidateFiles *[]ScannedFiles, maliciousVars *[]string) {
+	var report Report
+	report.Metadata = *scanMetadata
+	report.VerifiedFiles = *verifiedFiles
+	report.CandidateFiles = *candidateFiles
+	report.MaliciousFiles = *maliciousFiles
+	report.MaliciousVars = *maliciousVars
+	directory := "/tmp/sys-check/reports"
+
+	err := os.Mkdir(directory, os.ModeDir)
+
+	if err != nil {
+		fmt.Println("Error creating directory:", err)
+		return
+	}
+
+	filnename := fmt.Sprintf("%s/%s-%s-report.json", directory, scanMetadata.Hostname, scanMetadata.IPv4Address)
+
+	file, err := os.Create(filnename)
+	if err != nil {
+		fmt.Println("Error creating file:", err)
+		return
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	err = encoder.Encode(report)
+	if err != nil {
+		fmt.Println("Error encoding JSON:", err)
+		return
+	}
 
 }
 
@@ -219,12 +215,71 @@ func main() {
 		log.Fatal("Failed to decode JSON data:", err)
 	}
 
-	// process data
+	// validate data
+	validatedData, maliciousVars, err := validateData(scanData.Files)
+	if err != nil {
+		log.Println("Data validation failed:", err)
+	}
 
-	validFiles, invalidFiles, err := checkHashes(&scanData.Files, db)
+	// process data
+	verifiedFiles, maliciousFiles, candidateFiles, err := checkHashes(validatedData, db)
 	if err != nil {
 		log.Println("Database query failed:", err)
 	}
 
-	prepareReport(&scanData, validFiles, invalidFiles)
+	prepareReport(&scanData.Metadata, verifiedFiles, maliciousFiles, candidateFiles, maliciousVars)
+}
+
+func validateData(files []ScannedFiles) (*[]ScannedFiles, *[]string, error) {
+	// Regular expression pattern to match symbols that could be used in a SQL injection attack
+	injectionPattern := `(?i)[^a-z0-9\s](['";\\/\-*])`
+
+	// Compile the pattern
+	regexpPattern, err := regexp.Compile(injectionPattern)
+	if err != nil {
+		fmt.Printf("Error compiling regex pattern: %s\n", err)
+		return &files, nil, err
+	}
+
+	// Slice to store malicious variables
+	maliciousVars := make([]string, 0)
+
+	for i := 0; i < len(files); i++ {
+		// Check MD5
+		if matched := regexpPattern.MatchString(files[i].MD5); matched {
+			maliciousVars = append(maliciousVars, files[i].MD5)
+			files = append(files[:i], files[i+1])
+		}
+
+		// Check SHA1
+		if matched := regexpPattern.MatchString(files[i].SHA1); matched {
+			maliciousVars = append(maliciousVars, files[i].SHA1)
+			files = append(files[:i], files[i+1])
+		}
+
+		// Check SHA256
+		if matched := regexpPattern.MatchString(files[i].SHA256); matched {
+			maliciousVars = append(maliciousVars, files[i].SHA256)
+			files = append(files[:i], files[i+1])
+		}
+
+		// Check SHA512
+		if matched := regexpPattern.MatchString(files[i].SHA512); matched {
+			maliciousVars = append(maliciousVars, files[i].SHA512)
+			files = append(files[:i], files[i+1])
+		}
+
+		// Check Size
+		if matched := regexpPattern.MatchString(string(files[i].Size)); matched {
+			maliciousVars = append(maliciousVars, string(files[i].Size))
+			files = append(files[:i], files[i+1])
+		}
+
+		// Check Path
+		if matched := regexpPattern.MatchString(files[i].Path); matched {
+			maliciousVars = append(maliciousVars, files[i].Path)
+			files = append(files[:i], files[i+1])
+		}
+	}
+	return &files, &maliciousVars, nil
 }

@@ -114,20 +114,20 @@ def process_batch(batch, results_queue):
             result.append(processed_file)
     results_queue.put(result)
 
-def get_ipv4_address():
-    hostname = socket.gethostname()
-    ip_address = socket.gethostbyname(hostname)
-    return ip_address
+def get_metadata():
+    metadata = {
+    'hostname': socket.gethostname(),
+    'ip_address': socket.gethostbyname(socket.gethostname())
+    }
+    return metadata
 
 def check_files_integrity(file_list):
     payload_data = {}
     payload_data['files'] = file_list
-    payload_data['ipv4'] = get_ipv4_address()
+    payload_data['metadata'] = get_metadata()
     payload_data['status'] = 'processing'
 
-def send_integrity_request(payload):
-    port = int(os.getenv('PORT', '8000'))
-    host = os.getenv('HOST', '127.0.0.1')
+def send_integrity_request(payload, host, port):
     url = f'http://{host}:{port}'
 
     json_payload = json.dumps(payload)
@@ -174,9 +174,13 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             dirs=dict(type='list', required=True),
+            service_host=dict(type='string', required=True),
+            service_port=dict(type='int', required=True)
         )
     )
     dirs = module.params['dirs']
+    service_host = module.params['service_host']
+    service_port = module.params['service_port']
 
     threads = []
     for dir in dirs:
@@ -191,13 +195,12 @@ def main():
     # Sends a signal indicating that all data was sent out
     payload_data = {}
     payload_data['files'] = []
-    payload_data['ipv4'] = get_ipv4_address()
+    payload_data['metadata'] = get_metadata()
     payload_data['status'] = 'final'
 
-    send_integrity_request(payload_data)
+    send_integrity_request(payload_data, service_host, service_port)
 
     module.exit_json(changed=False)
 
 if __name__ == '__main__':
-    load_dotenv()
     main()

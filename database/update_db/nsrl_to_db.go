@@ -13,6 +13,7 @@ import (
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
+
 func processChunk(chunk [][]string, db *sql.DB, counter int) int {
 	chunkLength := len(chunk)
 	for _, row := range chunk {
@@ -25,10 +26,10 @@ func processChunk(chunk [][]string, db *sql.DB, counter int) int {
 		}
 
 		_, err := db.Exec(`
-			INSERT INTO nsrl_files (sha1, filesize, filepath)
-			VALUES ($1, $2, $3)
+			INSERT INTO files (sha1, filesize, filepath, status)
+			VALUES ($1, $2, $3, $4)
 			ON CONFLICT (sha1) DO NOTHING;
-		`, row[1], row[2], row[3])
+		`, row[1], row[2], row[3], "verified")
 		if err != nil {
 			log.Println(err)
 			continue

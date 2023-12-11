@@ -1,42 +1,27 @@
 DROP DATABASE IF EXISTS <database_name>;
 CREATE DATABASE <database_name>;
 
-CREATE TABLE IF NOT EXISTS <database_name>.nsrl (
+CREATE TABLE IF NOT EXISTS <database_name>.files (
     id SERIAL PRIMARY KEY,
     sha1 VARCHAR(40) UNIQUE,
     md5 VARCHAR(32) UNIQUE,
     sha256 VARCHAR(64) UNIQUE,
     sha512 VARCHAR(128) UNIQUE,
     filesize VARCHAR(128),
-    filepath VARCHAR(512)
+    filepath VARCHAR(512),
+    status VARCHAR(10) --Indicates the status (verified, candidate, malicious)
 );
 
-CREATE TABLE IF NOT EXISTS <database_name>.verified (
-    id SERIAL PRIMARY KEY,
-    sha1 VARCHAR(40) UNIQUE,
-    md5 VARCHAR(32) UNIQUE,
-    sha256 VARCHAR(64) UNIQUE,
-    sha512 VARCHAR(128) UNIQUE,
-    filesize VARCHAR(128),
-    filepath VARCHAR(512)
-);
+CREATE TABLE IF NOT EXISTS <database_name>.verified AS
+SELECT * FROM <database_name>.files WHERE status = 'verified';
 
-CREATE TABLE IF NOT EXISTS <database_name>.candidates (
-    id SERIAL PRIMARY KEY,
-    sha1 VARCHAR(40) UNIQUE,
-    md5 VARCHAR(32) UNIQUE,
-    sha256 VARCHAR(64) UNIQUE,
-    sha512 VARCHAR(128) UNIQUE,
-    filesize VARCHAR(128),
-    filepath VARCHAR(512)
-);
+CREATE TABLE IF NOT EXISTS <database_name>.candidates AS
+SELECT * FROM <database_name>.files WHERE status = 'candidate';
 
-CREATE TABLE IF NOT EXISTS <database_name>.malicious (
-    id SERIAL PRIMARY KEY,
-    sha1 VARCHAR(40) UNIQUE,
-    md5 VARCHAR(32) UNIQUE,
-    sha256 VARCHAR(64) UNIQUE,
-    sha512 VARCHAR(128) UNIQUE,
-    filesize VARCHAR(128),
-    filepath VARCHAR(512)
-);
+CREATE TABLE IF NOT EXISTS <database_name>.malicious AS
+SELECT * FROM <database_name>.files WHERE status = 'malicious';
+
+CREATE INDEX idx_md5 ON <database_name>.files (md5);
+CREATE INDEX idx_sha1 ON <database_name>.files (sha1);
+CREATE INDEX idx_sha256 ON <database_name>.files (sha256);
+CREATE INDEX idx_sha512 ON <database_name>.files (sha512);
