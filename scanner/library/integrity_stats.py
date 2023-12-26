@@ -10,21 +10,27 @@ import grp
 import datetime
 import threading
 import queue
-from dotenv import load_dotenv
 import requests
+import datetime
 
 def get_file_paths(directory):
     file_paths = []
-    excluded_extensions = ['tar', 'zip', 'rar', '.gz']
-    
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            file_path = os.path.join(root, file)
-            file_extension = os.path.splitext(file_path)[1].lower()
-            
-            if file_extension not in excluded_extensions:
-                file_paths.append(file_path)
-    
+    excluded_extensions = ['.tar', '.zip', '.rar', '.gz']
+
+    def search_files(curr_dir):
+        for root, dirs, files in os.walk(curr_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                file_extension = os.path.splitext(file_path)[1].lower()
+
+                if file_extension not in excluded_extensions:
+                    file_paths.append(file_path)
+
+            for dir in dirs:
+                next_dir = os.path.join(root, dir)
+                search_files(next_dir)
+
+    search_files(directory)
     return file_paths
 
 def calculate_checksum(file, checksum_algorithm, results_queue):
@@ -64,11 +70,11 @@ def get_file_details(file):
     full_path = os.path.abspath(file)
     file_name = os.path.basename(full_path)
     create_time = os.path.getctime(full_path)
-    create_date = datetime.datetime.fromtimestamp(create_time)
+    create_date = datetime.datetime.fromtimestamp(create_time).isoformat()
     modify_time = os.path.getmtime(full_path)
-    modify_date = datetime.datetime.fromtimestamp(modify_time)
+    modify_date = datetime.datetime.fromtimestamp(modify_time).isoformat()
     access_time = os.path.getatime(full_path)
-    access_date = datetime.datetime.fromtimestamp(access_time)
+    access_date = datetime.datetime.fromtimestamp(access_time).isoformat()
     file_stat = os.stat(full_path)
     owner = pwd.getpwuid(file_stat.st_uid).pw_name
     group = grp.getgrgid(file_stat.st_gid).gr_name
@@ -99,6 +105,8 @@ def process_file(file):
     if os.path.exists(file) and os.path.isfile(file):
         file_details = get_file_details(file)
         checksums = calculate_checksums(file)
+        if len(checksums) < 4:
+            return None
         file_details['MD5'] = checksums[0]
         file_details['SHA1'] = checksums[1]
         file_details['SHA256'] = checksums[2]
@@ -122,85 +130,108 @@ def get_metadata():
     return metadata
 
 def check_files_integrity(file_list):
-    payload_data = {}
-    payload_data['files'] = file_list
-    payload_data['metadata'] = get_metadata()
-    payload_data['status'] = 'processing'
+    metadata = get_metadata()
+    payload_data = {
+    "files" : file_list,
+    "metadata" : metadata,
+    "status" : "processing"
+    }
+    
+    send_integrity_request(payload_data)
 
-def send_integrity_request(payload, host, port):
-    url = f'http://{host}:{port}'
-
+def send_integrity_request(payload):
+    url = f'http://{service_host}:{service_port}'
     json_payload = json.dumps(payload)
     headers = {'Content-Type': 'application/json'}
     response = requests.post(url, data=json_payload, headers=headers)
 
     if response.status_code == 200:
-        response_data = response.json()
-        print(response_data)
+        print('Request succseeded!')
     else:
         # Request failed
         print('Request failed:', response.status_code)
 
 def process_dir(directory):
-    batch_limit = 10000
+    # batch_limit = 10000
     file_paths = get_file_paths(directory)
 
     results = []
-    if len(file_paths) > batch_limit:
-        batches = to_batches(file_paths, batch_limit)
-        results_queue = queue.Queue()
-        threads = []
-        for batch in batches:
-            thread = threading.Thread(target=process_batch, args=(batch, results_queue))
-            threads.append(thread)
-            thread.start()
-
-        for thread in threads:
-            thread.join()
-
-        while not results_queue.empty():
-            results.extend(results_queue.get())
-    else:
-        for file in file_paths:
+    for file in file_paths:
             processed_file = process_file(file)
             if processed_file != None:
                 results.append(processed_file)
+    # if len(file_paths) > batch_limit:
+    #     batches = to_batches(file_paths, batch_limit)
+    #     results_queue = queue.Queue()
+    #     threads = []
+    #     for batch in batches:
+    #         thread = threading.Thread(target=process_batch, args=(batch, results_queue))
+    #         threads.append(thread)
+    #         thread.start()
 
-    if len(results) > 1:
+    #     for thread in threads:
+    #         thread.join()
+
+    #     while not results_queue.empty():
+    #         results.extend(results_queue.get())
+    # else:
+    #     for file in file_paths:
+    #         processed_file = process_file(file)
+    #         if processed_file != None:
+    #             results.append(processed_file)
+
+    if len(results) > 0:
         check_files_integrity(results)
 
 
 def main():
-    module = AnsibleModule(
-        argument_spec=dict(
-            dirs=dict(type='list', required=True),
-            service_host=dict(type='string', required=True),
-            service_port=dict(type='int', required=True)
-        )
-    )
-    dirs = module.params['dirs']
-    service_host = module.params['service_host']
-    service_port = module.params['service_port']
+    global service_host
+    global service_port
+    # module = AnsibleModule(
+    #     argument_spec=dict(
+    #         directories=dict(type='list', required=True),
+    #         service_host=dict(type='str', required=True),
+    #         service_port=dict(type='int', required=True),
+    #     )
+    # )
+    
+    # dirs = module.params["directories"]
+    # service_host = module.params['service_host']
+    # service_port = module.params['service_port']
+
+    dirs = [
+        "/root",
+        "/bin"
+        ]
+    service_host = "127.0.0.1"
+    service_port = 6969
+
+    # Initialize a threading.Semaphore
+    semaphore = threading.Semaphore(0)
 
     threads = []
     for dir in dirs:
-        thread = threading.Thread(target=process_dir, args=(dir))
+        thread = threading.Thread(target=process_dir, args=(dir,))
         threads.append(thread)
         thread.start()
 
     for thread in threads:
         thread.join()
 
-
+    # Wait until the semaphore is released as many times as the number of threads
+    for _ in range(len(dirs)):
+        semaphore.acquire()
+        
+    # All threads have finished their work
     # Sends a signal indicating that all data was sent out
     payload_data = {}
     payload_data['files'] = []
     payload_data['metadata'] = get_metadata()
     payload_data['status'] = 'final'
 
-    send_integrity_request(payload_data, service_host, service_port)
+    send_integrity_request(payload_data)
 
-    module.exit_json(changed=False)
+    # module.exit_json(changed=False)
 
 if __name__ == '__main__':
     main()

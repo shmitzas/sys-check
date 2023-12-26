@@ -1,6 +1,11 @@
-DROP USER IF EXISTS '<username>';
-CREATE USER '<username>' IDENTIFIED BY '<password>';
+-- Revoke privileges on the database if necessary
+REVOKE ALL PRIVILEGES ON DATABASE <database_name> FROM <username>;
 
-GRANT ALL ON <database_name>.* TO '<username>';
+-- Drop the user if it exists
+DROP USER IF EXISTS <username>;
 
-FLUSH PRIVILEGES;
+-- Create the user
+CREATE USER <username> PASSWORD '<password>';
+
+-- Grant privileges to the user
+GRANT ALL PRIVILEGES ON DATABASE <database_name> TO <username>;

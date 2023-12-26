@@ -23,24 +23,30 @@ logger.addHandler(log_handler)
 @app.post('/')
 async def process_request(data: dict):
     try:
-        data_to_json = json.dumps(data)
-        json_data = json.loads(data_to_json)
+        analyzer_bin = os.getenv('ANALYZER_BIN')
+        report_finalizer_bin = os.getenv('REPORT_FINALIZER_BIN')
+    except Exception as e:
+        logger.error(f'Invalid Analyzer/Report_finalizer paths: {e}')
+        return {'ERROR': 422, 'message': 'nvalid Analyzer/report_finalizer paths'}
+    try:
+        with open("request_data.json", "w") as json_file:
+            json.dump(data, json_file)
+
     except Exception as e:
         logger.error(f'Invalid JSON data: {e}')
-        print(data)
         return {'ERROR': 422, 'message': 'Invalid JSON data'}
-    if json_data['status'] == "processing":
+    if data['status'] == "processing":
         try:
-            subprocess.run(['/home/netsec/Desktop/praktika/analyzer_service/analyzer/analyzer'], input=json.dumps(json_data), capture_output=True, text=True)
+            subprocess.run([analyzer_bin], input=json.dumps(data), capture_output=True, text=True)
         except Exception as e:
             logger.exception(f'Unexpected error occurred: {e}')
             return {'ERROR': 422, 'message': 'Anazlyzer crashed'}
         return 'OK'
-    if json_data['status'] == "final":
+    if data['status'] == "final":
         try:
-            hostname = json_data['metadata']['hostname']
-            ipv4_address = json_data['metadata']['ipv4_address']
-            subprocess.run(['/home/netsec/Desktop/praktika/analyzer_service/report_finalizer/report_finalizer', hostname, ipv4_address], capture_output=True, text=True)
+            hostname = data['metadata']['hostname']
+            ipv4_address = data['metadata']['ipv4_address']
+            subprocess.run([report_finalizer_bin, hostname, ipv4_address], capture_output=True, text=True)
         except Exception as e:
             logger.exception(f'Unexpected error occurred: {e}')
             return {'ERROR': 422, 'message': 'Report finalizer crashed'}

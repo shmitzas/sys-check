@@ -1,17 +1,7 @@
 ---
 - hosts: localhost
-  tasks:
-    - name: Setup scans result directory
-      file:
-        path: /tmp/sys_check/results/scans
-        state: directory
-
-- hosts: all
   gather_facts: yes
-  vars:
-    result_dir: /tmp/sys_check/results
   tasks:
     - name: Gather Linux machine file info
       include_tasks: tasks/file_scan_linux.yml
-      register: scan_result
       when: ansible_facts.system == 'Linux'

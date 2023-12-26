@@ -1,10 +1,13 @@
 DROP DATABASE IF EXISTS <database_name>;
 CREATE DATABASE <database_name>;
 
+CREATE SCHEMA IF NOT EXISTS <database_name>;
+SET search_path = <database_name>;
+
 CREATE TABLE IF NOT EXISTS <database_name>.files (
     id SERIAL PRIMARY KEY,
-    sha1 VARCHAR(40) UNIQUE,
     md5 VARCHAR(32) UNIQUE,
+    sha1 VARCHAR(40) UNIQUE,
     sha256 VARCHAR(64) UNIQUE,
     sha512 VARCHAR(128) UNIQUE,
     filesize VARCHAR(128),
