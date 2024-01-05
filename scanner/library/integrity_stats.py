@@ -9,9 +9,47 @@ import pwd
 import grp
 import datetime
 import threading
-import queue
 import requests
-import datetime
+
+def search_files(starting_directory, depth=0, depth_limit=4):
+    if depth > depth_limit:
+        return []
+
+    found_files = []
+    excluded_extensions = ['.zip', '.rar', '.tar', '.gz', '.7z', '.bz2', '.xz', '.tar.gz', '.tar.bz2', '.tar.xz', '.tar.7z']
+    for root, dirs, files in os.walk(starting_directory):
+        for file in files:
+            file_path = os.path.join(root, file)
+            file_extension = os.path.splitext(file_path)[1].lower()
+
+            if file_extension not in excluded_extensions:
+                found_files.append(file_path)
+
+        if depth < depth_limit:
+            for dir in dirs:
+                found_files.extend(search_files(os.path.join(root, dir), depth + 1))
+
+        break
+
+    return found_files
+
+
+def search_directories(starting_directory, depth=0, depth_limit=4):
+    if depth > depth_limit:
+        return []
+
+    found_directories = []
+
+    for root, dirs, _ in os.walk(starting_directory):
+        for dir in dirs:
+            found_directories.append(os.path.join(root, dir))
+
+            if depth < depth_limit:
+                found_directories.extend(search_directories(os.path.join(root, dir), depth + 1))
+
+        break
+
+    return found_directories
 
 def get_file_paths(directory):
     file_paths = []
@@ -33,7 +71,7 @@ def get_file_paths(directory):
     search_files(directory)
     return file_paths
 
-def calculate_checksum(file, checksum_algorithm, results_queue):
+def calculate_checksum(file, checksum_algorithm):
     hash_algo = hashlib.new(checksum_algorithm)
     try:
         with open(file, 'rb') as f:
@@ -43,28 +81,20 @@ def calculate_checksum(file, checksum_algorithm, results_queue):
                     if not data:
                         break
                 except:
-                    return 'An error occured while calculating checksum'
+                    return None
                 hash_algo.update(data)
     except:
-        return 'Checksum cannot be calculated due to insufficient permissions'
-    results_queue.put(hash_algo.hexdigest()) 
+        return None
+    return hash_algo.hexdigest()
 
 def calculate_checksums(file):
     checksum_algorithms = [ 'MD5', 'SHA1', 'SHA256', 'SHA512' ]
     checksums = []
-    results_queue = queue.Queue()
-    threads = []
     for algo in checksum_algorithms:
-        thread = threading.Thread(target=calculate_checksum, args=(file, algo, results_queue))
-        threads.append(thread)
-        thread.start()
-
-        for thread in threads:
-            thread.join()
-
-        while not results_queue.empty():
-            checksums.append(results_queue.get())
-    return checksums   
+        checksum = calculate_checksum(file, algo)
+        if checksum != None:
+            checksums.append(checksum)
+    return checksums  
 
 def get_file_details(file):
     full_path = os.path.abspath(file)
@@ -94,13 +124,6 @@ def get_file_details(file):
     }
     return file_details
 
-def to_batches(initial_list, batch_size):
-    batches = []
-    for i in range(0, len(initial_list), batch_size):
-        batch = initial_list[i:i+batch_size]
-        batches.append(batch)
-    return batches
-
 def process_file(file):
     if os.path.exists(file) and os.path.isfile(file):
         file_details = get_file_details(file)
@@ -114,14 +137,6 @@ def process_file(file):
         return file_details
     return None
 
-def process_batch(batch, results_queue):
-    result = []
-    for file in batch:
-        processed_file = process_file(file)
-        if processed_file != None:
-            result.append(processed_file)
-    results_queue.put(result)
-
 def get_metadata():
     metadata = {
     'hostname': socket.gethostname(),
@@ -130,10 +145,9 @@ def get_metadata():
     return metadata
 
 def check_files_integrity(file_list):
-    metadata = get_metadata()
     payload_data = {
     "files" : file_list,
-    "metadata" : metadata,
+    "metadata" : get_metadata(),
     "status" : "processing"
     }
     
@@ -145,72 +159,21 @@ def send_integrity_request(payload):
     headers = {'Content-Type': 'application/json'}
     response = requests.post(url, data=json_payload, headers=headers)
 
-    if response.status_code == 200:
-        print('Request succseeded!')
-    else:
-        # Request failed
+    if response.status_code != 200:
         print('Request failed:', response.status_code)
 
-def process_dir(directory):
-    # batch_limit = 10000
-    file_paths = get_file_paths(directory)
-
-    results = []
-    for file in file_paths:
-            processed_file = process_file(file)
-            if processed_file != None:
-                results.append(processed_file)
-    # if len(file_paths) > batch_limit:
-    #     batches = to_batches(file_paths, batch_limit)
-    #     results_queue = queue.Queue()
-    #     threads = []
-    #     for batch in batches:
-    #         thread = threading.Thread(target=process_batch, args=(batch, results_queue))
-    #         threads.append(thread)
-    #         thread.start()
-
-    #     for thread in threads:
-    #         thread.join()
-
-    #     while not results_queue.empty():
-    #         results.extend(results_queue.get())
-    # else:
-    #     for file in file_paths:
-    #         processed_file = process_file(file)
-    #         if processed_file != None:
-    #             results.append(processed_file)
-
-    if len(results) > 0:
-        check_files_integrity(results)
-
-
-def main():
-    global service_host
-    global service_port
-    # module = AnsibleModule(
-    #     argument_spec=dict(
-    #         directories=dict(type='list', required=True),
-    #         service_host=dict(type='str', required=True),
-    #         service_port=dict(type='int', required=True),
-    #     )
-    # )
-    
-    # dirs = module.params["directories"]
-    # service_host = module.params['service_host']
-    # service_port = module.params['service_port']
-
-    dirs = [
-        "/root",
-        "/bin"
-        ]
-    service_host = "127.0.0.1"
-    service_port = 6969
-
-    # Initialize a threading.Semaphore
-    semaphore = threading.Semaphore(0)
-
+def process_root_dir(directory):
     threads = []
-    for dir in dirs:
+    
+    partial_files = search_files(directory)
+    process_file_paths(partial_files)
+    
+    thread = threading.Thread(target=process_file_paths, args=(partial_files,))
+    threads.append(thread)
+    thread.start()
+    
+    sub_dirs = search_directories(directory)   
+    for dir in sub_dirs:
         thread = threading.Thread(target=process_dir, args=(dir,))
         threads.append(thread)
         thread.start()
@@ -218,20 +181,48 @@ def main():
     for thread in threads:
         thread.join()
 
-    # Wait until the semaphore is released as many times as the number of threads
-    for _ in range(len(dirs)):
-        semaphore.acquire()
-        
-    # All threads have finished their work
+def process_dir(directory):
+    file_paths = get_file_paths(directory) 
+    process_file_paths(file_paths)
+
+def process_file_paths(file_paths):
+    results = []
+    for file in file_paths:
+            processed_file = process_file(file)
+            if processed_file != None:
+                results.append(processed_file)
+                
+    if len(results) > 0:
+        check_files_integrity(results)
+
+def main():
+    global service_host
+    global service_port
+    module = AnsibleModule(
+        argument_spec=dict(
+            directories=dict(type='list', required=True),
+            service_host=dict(type='str', required=True),
+            service_port=dict(type='int', required=True),
+        )
+    )
+    
+    dirs = module.params["directories"]
+    service_host = module.params['service_host']
+    service_port = module.params['service_port']
+    
+    for dir in dirs:
+        process_root_dir(dir)
+
     # Sends a signal indicating that all data was sent out
-    payload_data = {}
-    payload_data['files'] = []
-    payload_data['metadata'] = get_metadata()
-    payload_data['status'] = 'final'
+    payload_data = {
+    "files" : [],
+    "metadata" : get_metadata(),
+    "status" : "final"
+    }
 
     send_integrity_request(payload_data)
 
-    # module.exit_json(changed=False)
+    module.exit_json(changed=False)
 
 if __name__ == '__main__':
     main()

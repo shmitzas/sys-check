@@ -37,13 +37,14 @@ func main() {
 
 	host := os.Getenv("DB_HOST")
 	port, _ := strconv.Atoi(os.Getenv("DB_PORT"))
-	dbname := os.Getenv("DB_NAME")
+	dbName := os.Getenv("DB_NAME")
+	dbSchema := os.Getenv("DB_SCHEMA")
 	user := os.Getenv("DB_USER")
 	password := os.Getenv("DB_PASSWORD")
 
 	// Creates connection with the database
-	psqlInfo := fmt.Sprintf("host=%s port=%d dbname=%s user=%s password=%s sslmode=disable",
-		host, port, dbname, user, password)
+	psqlInfo := fmt.Sprintf("host=%s port=%d dbName=%s search_path=%s user=%s password=%s sslmode=disable",
+		host, port, dbName, dbSchema, user, password)
 	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
 		log.Fatal(err)
@@ -66,7 +67,7 @@ func main() {
 func uploadData(files []ScannedFiles, db *sql.DB) {
 	for i, file := range files {
 		_, err := db.Exec(`
-		INSERT INTO sys_check.files (MD5, SHA1, SHA256, SHA512, filesize, filepath, status)
+		INSERT INTO files (MD5, SHA1, SHA256, SHA512, filesize, filepath, status)
 		VALUES ($1, $2, $3, $4, $5, $6, $7);
 		`, file.MD5, file.SHA1, file.SHA256, file.SHA512, file.Size, file.Path, "verified")
 		if err != nil {

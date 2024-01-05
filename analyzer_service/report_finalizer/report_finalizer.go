@@ -3,10 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 type Report struct {
@@ -20,7 +18,7 @@ type Report struct {
 type ScannedFiles struct {
 	Name     string `json:"name"`
 	Path     string `json:"path"`
-	Size     string `json:"size"`
+	Size     int    `json:"size"`
 	Owner    string `json:"owner"`
 	Perm     string `json:"perm"`
 	Accessed string `json:"accessed"`
@@ -41,23 +39,21 @@ type Metadata struct {
 func main() {
 	// Get metadata from command-line arguments
 	var metadata Metadata
-	if len(os.Args) != 3 {
-		fmt.Println("Usage: bash report_finalizer <hostname> <ipv4_address>")
+	if len(os.Args) != 2 {
+		fmt.Println("Usage: bash report_finalizer <ipv4_address>")
 		return
 	}
 
-	metadata.Hostname = os.Args[1]
-	metadata.IPv4Address = os.Args[2]
+	metadata.IPv4Address = os.Args[1]
 
 	// Directory path and filename pattern
-	dirPath := "/tmp/sys-check/reports"
-	filenamePattern := fmt.Sprintf("%s-%s-report.json", metadata.Hostname, metadata.IPv4Address)
+	dirPath := fmt.Sprintf("/tmp/sys-check/reports-%s", metadata.IPv4Address)
 
 	// Find all JSON files matching the pattern
-	filePaths, err := findJSONFiles(dirPath, filenamePattern)
+	filePaths, err := findJSONFiles(dirPath)
 	if err != nil {
 		fmt.Printf("Error finding JSON files: %v\n", err)
-		fmt.Println("Usage: bash report_finalizer <hostname> <ipv4_address>")
+		fmt.Println("Usage: bash report_finalizer <ipv4_address>")
 		return
 	}
 
@@ -76,33 +72,39 @@ func main() {
 	}
 	combinedReport.Metadata = metadata
 
+	RemoveReports(filePaths)
+
 	// Write the combined report to a new JSON file
-	outputFilePath := filepath.Join(dirPath, "hostname-ipv4-final-report.json")
-	err = writeJSONFile(outputFilePath, combinedReport)
+	file, err := os.Create(fmt.Sprintf("%s/final-report.json", dirPath))
 	if err != nil {
-		fmt.Printf("Error writing combined report: %v\n", err)
+		fmt.Println("error creating file:", err)
+		return
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	err = encoder.Encode(combinedReport)
+	if err != nil {
+		fmt.Println("error encoding JSON:", err)
 		return
 	}
 
-	fmt.Println("Combined report created successfully.")
 }
 
 // findJSONFiles finds all JSON files in the given directory that match the filename pattern
-func findJSONFiles(dirPath, filenamePattern string) ([]string, error) {
+func findJSONFiles(directory string) ([]string, error) {
 	var filePaths []string
 
-	// Walk through the directory and find JSON files
-	err := filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
+	err := filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// Check if the file is a regular file and matches the filename pattern
-		if d.IsDir() || !strings.HasPrefix(d.Name(), filenamePattern) {
-			return nil
+		if !info.IsDir() {
+			filePaths = append(filePaths, path)
 		}
 
-		filePaths = append(filePaths, path)
 		return nil
 	})
 
@@ -146,6 +148,17 @@ func writeJSONFile(filePath string, data interface{}) error {
 	err = json.NewEncoder(file).Encode(data)
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func RemoveReports(filePaths []string) error {
+	for _, path := range filePaths {
+		err := os.Remove(path)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

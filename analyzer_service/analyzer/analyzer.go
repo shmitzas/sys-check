@@ -8,6 +8,8 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"sync"
+	"time"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -31,8 +33,7 @@ type ScannedFiles struct {
 }
 
 type Metadata struct {
-	IPv4Address string `json:"ipv4"`
-	Hostname    string `json:"hostname"`
+	IPv4Address string `json:"ip_address"`
 }
 
 type ScanRequest struct {
@@ -58,40 +59,25 @@ func checkHashes(files *[]ScannedFiles, db *sql.DB) (*[]ScannedFiles, *[]Scanned
 		fileStatus := checkIfFileExists(&file, db)
 
 		if fileStatus == "verified" {
+			file.FileStatus = "verified"
 			verifiedFiles = append(verifiedFiles, file)
 		}
 		if fileStatus == "malicious" {
+			file.FileStatus = "malicious"
 			maliciousFiles = append(maliciousFiles, file)
 		}
 		if fileStatus == "candidate" {
+			file.FileStatus = "candidate"
 			candidateFiles = append(candidateFiles, file)
 		}
 		if fileStatus == "none" {
-			err := insertNewFileData(&file, db)
-			if err != nil {
-				log.Println(err)
-			}
-		}
-
-		/* -- Old way
-		if checkIfFileExists(&file, db, "verified") {
-		verifiedFiles = append(verifiedFiles, file)
-		}
-
-		if checkIfFileExists(&file, db, "malicious") {
-			maliciousFiles = append(maliciousFiles, file)
-		}
-
-		if checkIfFileExists(&file, db, "candidates") {
+			file.FileStatus = "candidate"
 			candidateFiles = append(candidateFiles, file)
-		} else {
 			err := insertNewFileData(&file, db)
 			if err != nil {
 				log.Println(err)
 			}
 		}
-		*/
-
 	}
 
 	return &verifiedFiles, &maliciousFiles, &candidateFiles, nil
@@ -100,15 +86,17 @@ func checkHashes(files *[]ScannedFiles, db *sql.DB) (*[]ScannedFiles, *[]Scanned
 func checkIfFileExists(file *ScannedFiles, db *sql.DB) string {
 	stmt, err := db.Prepare(`
 		SELECT filepath, filesize, MD5, SHA1, SHA256, SHA512, status
-		FROM sys_check.files
+		FROM files
 		WHERE MD5 = $1 OR SHA1 = $2 OR SHA256 = $3 OR SHA512 = $4;
 	`)
 	if err != nil {
+		fmt.Errorf("error preparing query: \n%v", err)
 		return "none"
 	}
 
 	rows, err := stmt.Query(file.MD5, file.SHA1, file.SHA256, file.SHA512)
 	if err != nil {
+		fmt.Errorf("error executing query: \n%v", err)
 		return "none"
 	}
 
@@ -125,14 +113,15 @@ func checkIfFileExists(file *ScannedFiles, db *sql.DB) string {
 			&scannedFile.FileStatus,
 		)
 		if err != nil {
+			fmt.Errorf("error checking query results: \n%v", err)
 			return "none"
 		}
 		existingHashes = append(existingHashes, scannedFile)
 	}
 	rows.Close()
-
+	var result ScannedFiles
 	if len(existingHashes) > 0 {
-		var result = existingHashes[0]
+		result = existingHashes[0]
 		// Update the entry with all hash values if the respective hash value is empty
 		if result.MD5 == "" && file.MD5 != "" {
 			result.MD5 = file.MD5
@@ -149,120 +138,66 @@ func checkIfFileExists(file *ScannedFiles, db *sql.DB) string {
 
 		// Update the entry in the files table with the updated hash values
 		_, err = db.Exec(`
-			UPDATE sys_check.files
+			UPDATE files
 			SET MD5 = $1, SHA1 = $2, SHA256 = $3, SHA512 = $4
 			WHERE filepath = $5;
 		`, result.MD5, result.SHA1, result.SHA256, result.SHA512, result.Path)
 		if err != nil {
+			fmt.Errorf("error updating entry: \n%v", err)
 			return "none"
 		}
 	}
-	if file.FileStatus == "" {
+	if result.FileStatus == "" {
 		return "none"
 	}
-	return file.FileStatus
+	return result.FileStatus
 }
-
-// func checkIfFileExists(file *ScannedFiles, db *sql.DB, tableName string) bool {
-// 	stmt, err := db.Prepare(`
-// 		SELECT filepath, filesize, MD5, SHA1, SHA256, SHA512
-// 		FROM sys_check.` + tableName + `
-// 		WHERE MD5 = $1 OR SHA1 = $2 OR SHA256 = $3 OR SHA512 = $4;
-// 	`)
-// 	if err != nil {
-// 		return false
-// 	}
-
-// 	rows, err := stmt.Query(file.MD5, file.SHA1, file.SHA256, file.SHA512)
-// 	if err != nil {
-// 		return false
-// 	}
-
-// 	var existingHashes []ScannedFiles
-// 	for rows.Next() {
-// 		var scannedFile ScannedFiles
-// 		err := rows.Scan(
-// 			&scannedFile.MD5,
-// 			&scannedFile.SHA1,
-// 			&scannedFile.SHA256,
-// 			&scannedFile.SHA512,
-// 		)
-// 		if err != nil {
-// 			return false
-// 		}
-// 		existingHashes = append(existingHashes, scannedFile)
-// 	}
-// 	rows.Close()
-
-// 	if len(existingHashes) > 0 {
-// 		var result = existingHashes[0]
-// 		// Update the entry with all hash values if the respective hash value is empty
-// 		if result.MD5 == "" && file.MD5 != "" {
-// 			result.MD5 = file.MD5
-// 		}
-// 		if result.SHA1 == "" && file.SHA1 != "" {
-// 			result.SHA1 = file.SHA1
-// 		}
-// 		if result.SHA256 == "" && file.SHA256 != "" {
-// 			result.SHA256 = file.SHA256
-// 		}
-// 		if result.SHA512 == "" && file.SHA512 != "" {
-// 			result.SHA512 = file.SHA512
-// 		}
-
-// 		// Update the entry in the files table with the updated hash values
-// 		_, err = db.Exec(`
-// 			UPDATE sys_check.files
-// 			SET MD5 = $1, SHA1 = $2, SHA256 = $3, SHA512 = $4
-// 			WHERE filepath = $5;
-// 		`, result.MD5, result.SHA1, result.SHA256, result.SHA512, result.Path)
-// 		if err != nil {
-// 			return false
-// 		}
-// 	}
-// 	return true
-// }
 
 func insertNewFileData(file *ScannedFiles, db *sql.DB) error {
 	_, err := db.Exec(`
-		INSERT INTO sys_check.files (MD5, SHA1, SHA256, SHA512, filesize, filepath, status)
+		INSERT INTO files (MD5, SHA1, SHA256, SHA512, filesize, filepath, status)
 		VALUES ($1, $2, $3, $4, $5, $6, $7);
 	`, file.MD5, file.SHA1, file.SHA256, file.SHA512, file.Size, file.Path, "candidate")
 	if err != nil {
-		return fmt.Errorf("failed to insert new file data into files table: %v\n%s", err, file.SHA1)
+		return fmt.Errorf("failed to insert new file data into files table: \n%v\nFile details:\nPath: %v\nSize: %v\nMD5: %v\nSHA1: %v\nSHA256: %v\nSHA512: %v", err, file.Path, file.Size, file.MD5, file.SHA1, file.SHA256, file.SHA512)
 	}
 	return nil
 }
 
-func prepareReport(scanMetadata *Metadata, verifiedFiles *[]ScannedFiles, maliciousFiles *[]ScannedFiles, candidateFiles *[]ScannedFiles, maliciousVars *[]string) {
+func saveReport(scanMetadata *Metadata, verifiedFiles *[]ScannedFiles, maliciousFiles *[]ScannedFiles, candidateFiles *[]ScannedFiles, maliciousVars *[]string) {
+
+	reportsDir := os.Getenv("REPORTS_DIR")
 	var report Report
 	report.Metadata = *scanMetadata
 	report.VerifiedFiles = *verifiedFiles
 	report.CandidateFiles = *candidateFiles
 	report.MaliciousFiles = *maliciousFiles
 	report.MaliciousVars = *maliciousVars
-	directory := "/tmp/sys-check/reports"
+	directory := fmt.Sprintf("%s-%s", reportsDir, scanMetadata.IPv4Address)
 
-	err := os.Mkdir(directory, os.ModeDir)
+	err := os.MkdirAll(directory, 0755)
 
 	if err != nil {
-		fmt.Println("Error creating directory:", err)
+		fmt.Printf("error creating directory '%s': %v\n", directory, err)
 		return
 	}
 
-	filnename := fmt.Sprintf("%s/%s-%s-report.json", directory, scanMetadata.Hostname, scanMetadata.IPv4Address)
+	currentTime := time.Now()
+	timestamp := currentTime.Format("2006-01-02-15:04:05")
+	filnename := fmt.Sprintf("%s/report-%s.json", directory, timestamp)
 
 	file, err := os.Create(filnename)
 	if err != nil {
-		fmt.Println("Error creating file:", err)
+		fmt.Println("error creating file:", err)
 		return
 	}
 	defer file.Close()
 
 	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
 	err = encoder.Encode(report)
 	if err != nil {
-		fmt.Println("Error encoding JSON:", err)
+		fmt.Println("error encoding JSON:", err)
 		return
 	}
 }
@@ -290,20 +225,25 @@ func readJson() (*ScanRequest, error) {
 }
 
 func main() {
-	err := godotenv.Load(".env")
+
+	// Load the .env file from the directory path
+	// envFilePath := os.Args[1]
+	envFilePath := "/home/hp/Documents/GitHub/sys-check/analyzer_service/analyzer/.env"
+	err := godotenv.Load(envFilePath)
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		log.Fatal("error loading .env file:", err)
 	}
 
 	host := os.Getenv("DB_HOST")
 	port, _ := strconv.Atoi(os.Getenv("DB_PORT"))
-	dbname := os.Getenv("DB_NAME")
+	dbName := os.Getenv("DB_NAME")
+	dbSchema := os.Getenv("DB_SCHEMA")
 	user := os.Getenv("DB_USER")
 	password := os.Getenv("DB_PASSWORD")
 
 	// Creates connection with the database
-	psqlInfo := fmt.Sprintf("host=%s port=%d dbname=%s user=%s password=%s sslmode=disable",
-		host, port, dbname, user, password)
+	psqlInfo := fmt.Sprintf("host=%s port=%d dbname=%s search_path=%s user=%s password=%s sslmode=disable",
+		host, port, dbName, dbSchema, user, password)
 	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
 		log.Fatal(err)
@@ -314,32 +254,56 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// var scanData ScanRequest
-
-	// // Parses json data and writes it to scanData var
-	// err = json.NewDecoder(os.Stdin).Decode(&scanData)
-	// if err != nil {
-	// 	log.Fatal("Failed to decode JSON data:", err)
-	// }
-
 	scanData, err := readJson()
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	batchSize := 1000
+	batches := split_to_batches(scanData.Files, batchSize)
+
+	// Create a WaitGroup to wait for all goroutines to finish
+	var wg sync.WaitGroup
+	wg.Add(len(batches))
+
+	for _, batch := range batches {
+		go process_batch(&batch, &scanData.Metadata, db, &wg)
+	}
+
+	wg.Wait()
+}
+
+func split_to_batches(files []ScannedFiles, batchSize int) [][]ScannedFiles {
+	var result [][]ScannedFiles
+
+	for i := 0; i < len(files); i += batchSize {
+		end := i + batchSize
+		if end > len(files) {
+			end = len(files)
+		}
+
+		result = append(result, files[i:end])
+	}
+
+	return result
+}
+
+func process_batch(files *[]ScannedFiles, metadata *Metadata, db *sql.DB, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	// validate data
-	validatedData, maliciousVars, err := validateData(scanData.Files)
+	validatedData, maliciousVars, err := validateData(*files)
 	if err != nil {
-		log.Println("Data validation failed:", err)
+		log.Println("data validation failed:", err)
 	}
 
 	// process data
 	verifiedFiles, maliciousFiles, candidateFiles, err := checkHashes(validatedData, db)
 	if err != nil {
-		log.Println("Database query failed:", err)
+		log.Println("database query failed:", err)
 	}
 
-	prepareReport(&scanData.Metadata, verifiedFiles, maliciousFiles, candidateFiles, maliciousVars)
+	saveReport(metadata, verifiedFiles, maliciousFiles, candidateFiles, maliciousVars)
 }
 
 func validateData(files []ScannedFiles) (*[]ScannedFiles, *[]string, error) {
@@ -349,7 +313,7 @@ func validateData(files []ScannedFiles) (*[]ScannedFiles, *[]string, error) {
 	// Compile the pattern
 	regexpPattern, err := regexp.Compile(injectionPattern)
 	if err != nil {
-		fmt.Printf("Error compiling regex pattern: %s\n", err)
+		fmt.Printf("error compiling regex pattern: %s\n", err)
 		return &files, nil, err
 	}
 
@@ -378,18 +342,6 @@ func validateData(files []ScannedFiles) (*[]ScannedFiles, *[]string, error) {
 		// Check SHA512
 		if matched := regexpPattern.MatchString(files[i].SHA512); matched {
 			maliciousVars = append(maliciousVars, files[i].SHA512)
-			files = append(files[:i], files[i+1])
-		}
-
-		// Check Size
-		if matched := regexpPattern.MatchString(string(files[i].Size)); matched {
-			maliciousVars = append(maliciousVars, string(files[i].Size))
-			files = append(files[:i], files[i+1])
-		}
-
-		// Check Path
-		if matched := regexpPattern.MatchString(files[i].Path); matched {
-			maliciousVars = append(maliciousVars, files[i].Path)
 			files = append(files[:i], files[i+1])
 		}
 	}

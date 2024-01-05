@@ -26,7 +26,7 @@ func processChunk(chunk [][]string, db *sql.DB, counter int) int {
 		}
 
 		_, err := db.Exec(`
-			INSERT INTO sys_check.files (sha1, filesize, filepath, status)
+			INSERT INTO files (sha1, filesize, filepath, status)
 			VALUES ($1, $2, $3, $4)
 			ON CONFLICT (sha1) DO NOTHING;
 		`, row[1], row[2], row[3], "verified")
@@ -52,12 +52,14 @@ func main() {
 
 	host := os.Getenv("DB_HOST")
 	port, _ := strconv.Atoi(os.Getenv("DB_PORT"))
-	dbname := os.Getenv("DB_NAME")
+	dbName := os.Getenv("DB_NAME")
+	dbSchema := os.Getenv("DB_SCHEMA")
 	user := os.Getenv("DB_USER")
 	password := os.Getenv("DB_PASSWORD")
 
-	psqlInfo := fmt.Sprintf("host=%s port=%d dbname=%s user=%s password=%s sslmode=disable",
-		host, port, dbname, user, password)
+	// Creates connection with the database
+	psqlInfo := fmt.Sprintf("host=%s port=%d dbName=%s search_path=%s user=%s password=%s sslmode=disable",
+		host, port, dbName, dbSchema, user, password)
 	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
 		log.Fatal(err)

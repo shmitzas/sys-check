@@ -12,19 +12,35 @@ CREATE TABLE IF NOT EXISTS <database_name>.files (
     sha512 VARCHAR(128) UNIQUE,
     filesize VARCHAR(128),
     filepath VARCHAR(512),
-    status VARCHAR(10) --Indicates the status (verified, candidate, malicious)
+    status VARCHAR(10) DEFAULT 'candidate' --Indicates the status (verified, candidate, malicious)
 );
 
-CREATE TABLE IF NOT EXISTS <database_name>.verified AS
-SELECT * FROM <database_name>.files WHERE status = 'verified';
+CREATE MATERIALIZED VIEW <database_name>.verified AS
+SELECT *
+FROM <database_name>.files
+WHERE status='verified';
 
-CREATE TABLE IF NOT EXISTS <database_name>.candidates AS
-SELECT * FROM <database_name>.files WHERE status = 'candidate';
+CREATE MATERIALIZED VIEW <database_name>.verified AS
+SELECT *
+FROM <database_name>.files
+WHERE status='candidate';
 
-CREATE TABLE IF NOT EXISTS <database_name>.malicious AS
-SELECT * FROM <database_name>.files WHERE status = 'malicious';
+CREATE MATERIALIZED VIEW <database_name>.verified AS
+SELECT *
+FROM <database_name>.files
+WHERE status='malicious';
 
-CREATE INDEX idx_md5 ON <database_name>.files (md5);
-CREATE INDEX idx_sha1 ON <database_name>.files (sha1);
-CREATE INDEX idx_sha256 ON <database_name>.files (sha256);
-CREATE INDEX idx_sha512 ON <database_name>.files (sha512);
+CREATE INDEX idx_files_md5 ON <database_name>.files (md5);
+CREATE INDEX idx_files_sha1 ON <database_name>.files (sha1);
+CREATE INDEX idx_files_sha256 ON <database_name>.files (sha256);
+CREATE INDEX idx_files_sha512 ON <database_name>.files (sha512);
+
+CREATE INDEX idx_candidates_md5 ON <database_name>.candidates (md5);
+CREATE INDEX idx_candidates_sha1 ON <database_name>.candidates (sha1);
+CREATE INDEX idx_candidates_sha256 ON <database_name>.candidates (sha256);
+CREATE INDEX idx_candidates_sha512 ON <database_name>.candidates (sha512);
+
+CREATE INDEX idx_malicious_md5 ON <database_name>.malicious (md5);
+CREATE INDEX idx_malicious_sha1 ON <database_name>.malicious (sha1);
+CREATE INDEX idx_malicious_sha256 ON <database_name>.malicious (sha256);
+CREATE INDEX idx_malicious_sha512 ON <database_name>.malicious (sha512);
