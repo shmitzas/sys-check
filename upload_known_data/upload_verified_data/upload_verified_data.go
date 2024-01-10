@@ -30,7 +30,7 @@ func main() {
 
 	filePath := os.Args[1]
 
-	err := godotenv.Load("/etc/sys_check/upload_data.env")
+	err := godotenv.Load("~/.sys-check/.env/upload_data.env")
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}

@@ -26,6 +26,37 @@
     ansible-playbook osinfo.yml -i inventory/hosts
     ```
 
+## Upload known data to the database
+- NIST NSRL Unique File Corpus data file
+    - Reformat data file
+        ```
+        cd <cloned sys-check repository path>/upload_known_data/upload_nsrl_data/formatter
+        ```
+        ```
+        python3 ensure_utf8.py <full path to data file> <full path to output file>
+        ```
+    - Upload data
+        ```
+        cd <cloned sys-check repository path>/upload_known_data/upload_nsrl_data
+        ```
+        ```
+        ./upload_nsrl_data <full path to reformated data file>
+        ```
+- Verified data JSON file
+    ```
+    cd <cloned sys-check repository path>/upload_known_data/upload_verified_data
+    ```
+    ```
+    ./upload_verified_data <full path to data file>
+    ```
+- Malicious data JSON file
+    ```
+    cd <cloned sys-check repository path>/upload_known_data/upload_malicious_data
+    ```
+    ```
+    ./upload_malicious_data <full path to data file>
+    ```
+
 # Setup
 - **NOTE: Setup only on Unix based OS, preferably Linux**
 - **NOTE: This system was developed for Debian based Linux distributions**
@@ -186,7 +217,7 @@
         ```
         cd <cloned sys-check repository path>/analyzer_service/analyzer
         ```
-    - Build analyzer
+    - Rebuild analyzer
         ```
         go build analyzer
         ```
@@ -195,7 +226,7 @@
         ```
         cd <cloned sys-check repository path>/analyzer_service/listener
         ```
-    - Build listener
+    - Rebuild listener
         ```
         go build listener
         ```
@@ -204,7 +235,24 @@
         ```
         cd <cloned sys-check repository path>/analyzer_service/report_finalizer
         ```
-    - Build report_finalizer
+    - Rebuild report_finalizer
         ```
         go build report_finalizer
+        ```
+- To rebuild known data uploading programs
+    - Navigate to known data uploading program directory
+        ```
+        cd <cloned sys-check repository path>/known data uploading
+        ```
+    - Rebuild upload_verified_data
+        ```
+        go build upload_verified_data
+        ```
+    - Rebuild upload_nsrl_data
+        ```
+        go build upload_verified_data
+        ```
+    - Rebuild upload_verified_data
+        ```
+        go build upload_malicious_data
         ```

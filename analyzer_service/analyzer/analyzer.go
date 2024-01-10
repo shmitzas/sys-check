@@ -220,7 +220,7 @@ func readJson() (*ScanRequest, error) {
 }
 
 func main() {
-	envFilePath := "/etc/sys_check/analyzer.env"
+	envFilePath := "~/.sys-check/.env/analyzer.env"
 	err := godotenv.Load(envFilePath)
 	if err != nil {
 		log.Fatal("error loading .env file:", err)

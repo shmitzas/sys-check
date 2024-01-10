@@ -40,7 +40,7 @@ type ScanRequest struct {
 }
 
 func main() {
-	err := godotenv.Load("/etc/sys_check/listener.env")
+	err := godotenv.Load("~/.sys-check/.env/listener.env")
 	if err != nil {
 		go logError(fmt.Errorf("error loading .env file: %v", err))
 	}
@@ -167,7 +167,13 @@ func combineReports(data *ScanRequest) error {
 }
 
 func logError(err error) {
-	filepath := fmt.Sprintf("%s/error.log", os.Getenv("ERROR_LOGS"))
+	errorLogDir := os.Getenv("ERROR_LOGS")
+	dirErr := os.MkdirAll(errorLogDir, 0755)
+	if dirErr != nil {
+		log.Println("failed to create logs directory:", dirErr)
+		return
+	}
+	filepath := fmt.Sprintf("%s/error.log", errorLogDir)
 	logFile, fileErr := os.OpenFile(filepath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if fileErr != nil {
 		log.Println("failed to open log file:", fileErr)
