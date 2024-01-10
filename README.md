@@ -1,10 +1,35 @@
-# sys-check
+# How to use sys-check tool
 
-## Setup
+1. Setup and configure sys-check system
+2. Start Analyzer listener service
+
+## Start Analyzer listener service
+1. Navigate to the cloned repository's analyzer_service directory
+    ```
+    cd <cloned sys-check repository path>/analyzer_service/listener
+    ```
+2. Start listener service
+    ```
+    ./listener
+    ```
+3. Target computer's file system's integrity report can be found at `<REPORTS_DIR>/reports-<target computer's ipv4 address>/final-report.json`
+
+## Application for scanning target computers
+1. Navigate to the cloned repository's scanner directory
+    ```
+    cd <cloned sys-check repository path>/scanner
+    ```
+2. Configure `hosts` and `file_scan_linux.yml` files as per setup instructions
+3. Start scanner
+    ```
+    ansible-playbook osinfo.yml -i inventory/hosts
+    ```
+
+# Setup
 - **NOTE: Setup only on Unix based OS, preferably Linux**
 - **NOTE: This system was developed for Debian based Linux distributions**
 
-### Setup backend server
+## Setup backend server
 1. Clone this repository
     ```
     git clone https://github.com/shmitzas/sys-check.git
@@ -28,7 +53,7 @@
     - `String` type variables: `DB_NAME=sys_check`
     - File path: `REPORTS_DIR=/tmp/sys_check/reports`
 
-### Setup Database server
+## Setup Database server
 1. Clone this repository
     ```
     git clone https://github.com/shmitzas/sys-check.git
@@ -98,7 +123,7 @@
     host    <database name>     <database user>     <specific IPv4 address>/32      trust
     ```
 
-### Setup environment for uploading know file data
+## Setup environment for uploading know file data
 1. Clone this repository
     ```
     git clone https://github.com/shmitzas/sys-check.git
@@ -121,7 +146,7 @@
     - Port: `DB_PORT=5432`
     - `String` type variables: `DB_NAME=sys_check`
 
-### Setup Application for scanning target computers
+## Setup Application for scanning target computers
 1. Clone this repository
     ```
     git clone https://github.com/shmitzas/sys-check.git
@@ -174,30 +199,3 @@
         ```
         go build report_finalizer
         ```
-
-## How to use sys-check tool
-
-1. Setup and configure sys-check system
-2. Start Analyzer listener service
-
-### Start Analyzer listener service
-1. Navigate to the cloned repository's analyzer_service directory
-    ```
-    cd <cloned sys-check repository path>/analyzer_service/listener
-    ```
-2. Start listener service
-    ```
-    ./listener
-    ```
-3. Target computer's file system's integrity report can be found at `<REPORTS_DIR>/reports-<target computer's ipv4 address>/final-report.json`
-
-### Application for scanning target computers
-1. Navigate to the cloned repository's scanner directory
-    ```
-    cd <cloned sys-check repository path>/scanner
-    ```
-2. Configure `hosts` and `file_scan_linux.yml` files as per setup instructions
-3. Start scanner
-    ```
-    ansible-playbook osinfo.yml -i inventory/hosts
-    ```
