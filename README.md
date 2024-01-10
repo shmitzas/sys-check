@@ -107,6 +107,9 @@
     ```
     psql -U postgres -f db_users.sql
     ```
+    ```
+    exit
+    ```
 10. Configure database connection limit
 - In `/etc/postgresql/13/main/postgresql.conf` file under `Connection Settings` change:
         - `max_connections = 100` from `100` to `200000` or any number between 1 and 200000
