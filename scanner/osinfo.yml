@@ -1,0 +1,7 @@
+---
+- hosts: linux
+  gather_facts: yes
+  tasks:
+    - name: Gather Linux machine file info
+      include_tasks: tasks/file_scan_linux.yml
+      when: ansible_facts.system == 'Linux'

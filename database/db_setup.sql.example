@@ -1,0 +1,37 @@
+DROP DATABASE IF EXISTS <database name>;
+CREATE DATABASE <database name>;
+
+CREATE SCHEMA IF NOT EXISTS <database name>;
+SET search_path = <database name>;
+
+CREATE TABLE IF NOT EXISTS <database name>.files (
+    id SERIAL PRIMARY KEY,
+    md5 VARCHAR(32) UNIQUE,
+    sha1 VARCHAR(40) UNIQUE,
+    sha256 VARCHAR(64) UNIQUE,
+    sha512 VARCHAR(128) UNIQUE,
+    filesize VARCHAR(128),
+    filepath VARCHAR(512),
+    status VARCHAR(10) DEFAULT 'candidate'
+);
+
+CREATE MATERIALIZED VIEW <database name>.verified AS
+SELECT *
+FROM <database name>.files
+WHERE status='verified';
+
+CREATE MATERIALIZED VIEW <database name>.candidate AS
+SELECT *
+FROM <database name>.files
+WHERE status='candidate';
+
+CREATE MATERIALIZED VIEW <database name>.malicious AS
+SELECT *
+FROM <database name>.files
+WHERE status='malicious';
+
+CREATE INDEX idx_files_md5 ON <database name>.files (md5);
+CREATE INDEX idx_files_sha1 ON <database name>.files (sha1);
+CREATE INDEX idx_files_sha256 ON <database name>.files (sha256);
+CREATE INDEX idx_files_sha512 ON <database name>.files (sha512);
+CREATE INDEX idx_files_status ON <database name>.files (status);
