@@ -1,6 +1,0 @@
-DROP USER IF EXISTS '<username>';
-CREATE USER '<username>' IDENTIFIED BY '<password>';
-
-GRANT ALL ON <database_name>.* TO '<username>';
-
-FLUSH PRIVILEGES;
