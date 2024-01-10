@@ -59,15 +59,11 @@
     ```
     git clone https://github.com/shmitzas/sys-check.git
     ```
-2. Navigate to the cloned repository's database directory
-    ```
-    cd <cloned sys-check repository path>/database
-    ```
-3. Install dependencies
+2. Install dependencies
     ```
     sudo apt install curl gpg gnupg2 software-properties-common apt-transport-https lsb-release ca-certificates
     ```
-4. Install PostgreSQL 13
+3. Install PostgreSQL 13
     ```
     curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc|sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
     ```
@@ -80,18 +76,22 @@
     ```
     sudo apt install postgresql-13 postgresql-client-13
     ```
-5. Start main cluster
+4. Start main cluster
     ```
     sudo systemctl start postgresql@13-main
     ```
+5. Navigate to the cloned repository's database directory
+    ```
+    cd <cloned sys-check repository path>/database
+    ```
 6. Copy database creation scripts to /tmp/
     ```
-    cp <cloned sys-check repository's full path>/database/db_setup.sql.example /tmp/db_setup.sql 
+    cp db_setup.sql.example /tmp/db_setup.sql 
     ```
     ```
-    cp <cloned sys-check repository's full path>/database/db_users.sql.example /tmp/db_users.sql 
+    cp db_users.sql.example /tmp/db_users.sql 
     ```
-7. Fill out `<placeholder text>` in `tmp/db_setup.sql ` and `/tmp/db_users.sql` files with actual data
+7. Fill out `<placeholder text>` in `/tmp/db_setup.sql ` and `/tmp/db_users.sql` files with actual data
 
 8. Change to postgres user
     ```
