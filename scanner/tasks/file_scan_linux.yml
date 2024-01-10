@@ -15,6 +15,6 @@
       - /var/snap
       - /var/lib
       # - /root
-    service_host: "192.168.136.133"
-    service_port: 6969
+    service_host: "127.0.0.1"
+    service_port: 6060
   become: true

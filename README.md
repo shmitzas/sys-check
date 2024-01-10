@@ -61,7 +61,7 @@
     ```
 2. Install dependencies
     ```
-    sudo apt install curl gpg gnupg2 software-properties-common apt-transport-https lsb-release ca-certificates
+    sudo apt install -y curl gpg gnupg2 software-properties-common apt-transport-https lsb-release ca-certificates
     ```
 3. Install PostgreSQL 13
     ```
@@ -74,7 +74,7 @@
     sudo apt update
     ```
     ```
-    sudo apt install postgresql-13 postgresql-client-13
+    sudo apt install -y postgresql-13 postgresql-client-13
     ```
 4. Start main cluster
     ```
