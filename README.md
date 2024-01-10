@@ -82,7 +82,7 @@
     ```
 5. Start main cluster
     ```
-    pg_ctlcluster 13 main start
+    sudo systemctl start postgresql@13-main
     ```
 6. Copy database creation scripts to /tmp/
     ```
@@ -123,6 +123,7 @@
     ```
     host    <database name>     <database user>     <specific IPv4 address>/32      trust
     ```
+- Allow database port through your firewall
 13. Restart main cluster to refresh configuration
     ```
     sudo systemctl restart postgresql@13-main
