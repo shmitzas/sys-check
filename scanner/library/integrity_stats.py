@@ -10,6 +10,24 @@ import grp
 import datetime
 import threading
 import requests
+import netifaces
+
+def get_local_ipv4_address():
+    try:
+        # Get the addresses associated with the interface
+        interfaces = netifaces.interfaces()
+        addresses = netifaces.ifaddresses(interfaces[1])
+
+        # Retrieve the IPv4 address if available
+        if netifaces.AF_INET in addresses:
+            ipv4_addresses = addresses[netifaces.AF_INET]
+            if ipv4_addresses:
+                return ipv4_addresses[0]['addr']
+
+        return None
+    except:
+        return None
+
 
 def search_files(starting_directory, depth=0, depth_limit=4):
     if depth > depth_limit:
@@ -139,8 +157,7 @@ def process_file(file):
 
 def get_metadata():
     metadata = {
-    'hostname': socket.gethostname(),
-    'ip_address': socket.gethostbyname(socket.gethostname())
+    'ip_address': get_local_ipv4_address()
     }
     return metadata
 
@@ -223,6 +240,6 @@ def main():
     send_integrity_request(payload_data)
 
     module.exit_json(changed=False)
-
+    
 if __name__ == '__main__':
     main()

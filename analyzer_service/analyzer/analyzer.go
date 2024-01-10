@@ -85,7 +85,7 @@ func checkHashes(files *[]ScannedFiles, db *sql.DB) (*[]ScannedFiles, *[]Scanned
 
 func checkIfFileExists(file *ScannedFiles, db *sql.DB) string {
 	stmt, err := db.Prepare(`
-		SELECT filepath, filesize, MD5, SHA1, SHA256, SHA512, status
+		SELECT MD5, SHA1, SHA256, SHA512, status
 		FROM files
 		WHERE MD5 = $1 OR SHA1 = $2 OR SHA256 = $3 OR SHA512 = $4;
 	`)
@@ -104,8 +104,6 @@ func checkIfFileExists(file *ScannedFiles, db *sql.DB) string {
 	for rows.Next() {
 		var scannedFile ScannedFiles
 		err := rows.Scan(
-			&scannedFile.Path,
-			&scannedFile.Size,
 			&scannedFile.MD5,
 			&scannedFile.SHA1,
 			&scannedFile.SHA256,
@@ -122,7 +120,6 @@ func checkIfFileExists(file *ScannedFiles, db *sql.DB) string {
 	var result ScannedFiles
 	if len(existingHashes) > 0 {
 		result = existingHashes[0]
-		// Update the entry with all hash values if the respective hash value is empty
 		if result.MD5 == "" && file.MD5 != "" {
 			result.MD5 = file.MD5
 		}
@@ -135,8 +132,6 @@ func checkIfFileExists(file *ScannedFiles, db *sql.DB) string {
 		if result.SHA512 == "" && file.SHA512 != "" {
 			result.SHA512 = file.SHA512
 		}
-
-		// Update the entry in the files table with the updated hash values
 		_, err = db.Exec(`
 			UPDATE files
 			SET MD5 = $1, SHA1 = $2, SHA256 = $3, SHA512 = $4
@@ -225,10 +220,7 @@ func readJson() (*ScanRequest, error) {
 }
 
 func main() {
-
-	// Load the .env file from the directory path
-	// envFilePath := os.Args[1]
-	envFilePath := "/home/hp/Documents/GitHub/sys-check/analyzer_service/analyzer/.env"
+	envFilePath := "/etc/sys_check/analyzer.env"
 	err := godotenv.Load(envFilePath)
 	if err != nil {
 		log.Fatal("error loading .env file:", err)
@@ -241,7 +233,6 @@ func main() {
 	user := os.Getenv("DB_USER")
 	password := os.Getenv("DB_PASSWORD")
 
-	// Creates connection with the database
 	psqlInfo := fmt.Sprintf("host=%s port=%d dbname=%s search_path=%s user=%s password=%s sslmode=disable",
 		host, port, dbName, dbSchema, user, password)
 	db, err := sql.Open("postgres", psqlInfo)
@@ -262,7 +253,6 @@ func main() {
 	batchSize := 1000
 	batches := split_to_batches(scanData.Files, batchSize)
 
-	// Create a WaitGroup to wait for all goroutines to finish
 	var wg sync.WaitGroup
 	wg.Add(len(batches))
 
@@ -291,13 +281,11 @@ func split_to_batches(files []ScannedFiles, batchSize int) [][]ScannedFiles {
 func process_batch(files *[]ScannedFiles, metadata *Metadata, db *sql.DB, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	// validate data
 	validatedData, maliciousVars, err := validateData(*files)
 	if err != nil {
 		log.Println("data validation failed:", err)
 	}
 
-	// process data
 	verifiedFiles, maliciousFiles, candidateFiles, err := checkHashes(validatedData, db)
 	if err != nil {
 		log.Println("database query failed:", err)
@@ -307,39 +295,29 @@ func process_batch(files *[]ScannedFiles, metadata *Metadata, db *sql.DB, wg *sy
 }
 
 func validateData(files []ScannedFiles) (*[]ScannedFiles, *[]string, error) {
-	// Regular expression pattern to match symbols that could be used in a SQL injection attack
 	injectionPattern := `(?i)[^a-z0-9\s](['";\\/\-*])`
 
-	// Compile the pattern
 	regexpPattern, err := regexp.Compile(injectionPattern)
 	if err != nil {
 		fmt.Printf("error compiling regex pattern: %s\n", err)
 		return &files, nil, err
 	}
 
-	// Slice to store malicious variables
 	maliciousVars := make([]string, 0)
 
 	for i := 0; i < len(files); i++ {
-		// Check MD5
 		if matched := regexpPattern.MatchString(files[i].MD5); matched {
 			maliciousVars = append(maliciousVars, files[i].MD5)
 			files = append(files[:i], files[i+1])
 		}
-
-		// Check SHA1
 		if matched := regexpPattern.MatchString(files[i].SHA1); matched {
 			maliciousVars = append(maliciousVars, files[i].SHA1)
 			files = append(files[:i], files[i+1])
 		}
-
-		// Check SHA256
 		if matched := regexpPattern.MatchString(files[i].SHA256); matched {
 			maliciousVars = append(maliciousVars, files[i].SHA256)
 			files = append(files[:i], files[i+1])
 		}
-
-		// Check SHA512
 		if matched := regexpPattern.MatchString(files[i].SHA512); matched {
 			maliciousVars = append(maliciousVars, files[i].SHA512)
 			files = append(files[:i], files[i+1])

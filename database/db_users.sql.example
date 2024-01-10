@@ -1,5 +1,5 @@
 -- Revoke privileges on the database if necessary
-REVOKE ALL PRIVILEGES ON DATABASE <database_name> FROM <username>;
+REVOKE ALL PRIVILEGES ON DATABASE <database name> FROM <username>;
 
 -- Drop the user if it exists
 DROP USER IF EXISTS <username>;
@@ -8,4 +8,4 @@ DROP USER IF EXISTS <username>;
 CREATE USER <username> PASSWORD '<password>';
 
 -- Grant privileges to the user
-GRANT ALL PRIVILEGES ON DATABASE <database_name> TO <username>;
+GRANT ALL PRIVILEGES ON DATABASE <database name> TO <username>;

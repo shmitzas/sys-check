@@ -3,8 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/joho/godotenv"
 )
 
 type Report struct {
@@ -33,36 +36,35 @@ type ScannedFiles struct {
 
 type Metadata struct {
 	IPv4Address string `json:"ipv4"`
-	Hostname    string `json:"hostname"`
 }
 
 func main() {
-	// Get metadata from command-line arguments
 	var metadata Metadata
 	if len(os.Args) != 2 {
-		fmt.Println("Usage: bash report_finalizer <ipv4_address>")
+		fmt.Println("missing ipv4_address")
 		return
+	}
+
+	err := godotenv.Load("/etc/sys_check/report_finalizer.env")
+	if err != nil {
+		log.Fatal("error loading .env file")
 	}
 
 	metadata.IPv4Address = os.Args[1]
+	reportsDir := os.Getenv("REPORTS_DIR")
+	dirPath := fmt.Sprintf("%s-%s", reportsDir, metadata.IPv4Address)
 
-	// Directory path and filename pattern
-	dirPath := fmt.Sprintf("/tmp/sys-check/reports-%s", metadata.IPv4Address)
-
-	// Find all JSON files matching the pattern
 	filePaths, err := findJSONFiles(dirPath)
 	if err != nil {
-		fmt.Printf("Error finding JSON files: %v\n", err)
-		fmt.Println("Usage: bash report_finalizer <ipv4_address>")
+		fmt.Printf("error finding JSON files: %v\n", err)
 		return
 	}
 
-	// Read and combine the JSON contents
 	var combinedReport Report
 	for _, filePath := range filePaths {
 		report, err := readJSONFile(filePath)
 		if err != nil {
-			fmt.Printf("Error reading JSON file %s: %v\n", filePath, err)
+			fmt.Printf("error reading JSON file %s: %v\n", filePath, err)
 			continue
 		}
 		combinedReport.VerifiedFiles = append(combinedReport.VerifiedFiles, report.VerifiedFiles...)
@@ -74,7 +76,44 @@ func main() {
 
 	RemoveReports(filePaths)
 
-	// Write the combined report to a new JSON file
+	WriteFinalReport(dirPath, combinedReport)
+}
+
+func findJSONFiles(directory string) ([]string, error) {
+	var filePaths []string
+
+	err := filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			filePaths = append(filePaths, path)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return filePaths, nil
+}
+
+func readJSONFile(filePath string) (Report, error) {
+	var report Report
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return report, err
+	}
+	defer file.Close()
+
+	err = json.NewDecoder(file).Decode(&report)
+	if err != nil {
+		return report, err
+	}
+	return report, nil
+}
+
+func WriteFinalReport(dirPath string, combinedReport Report) {
 	file, err := os.Create(fmt.Sprintf("%s/final-report.json", dirPath))
 	if err != nil {
 		fmt.Println("error creating file:", err)
@@ -89,68 +128,6 @@ func main() {
 		fmt.Println("error encoding JSON:", err)
 		return
 	}
-
-}
-
-// findJSONFiles finds all JSON files in the given directory that match the filename pattern
-func findJSONFiles(directory string) ([]string, error) {
-	var filePaths []string
-
-	err := filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if !info.IsDir() {
-			filePaths = append(filePaths, path)
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return filePaths, nil
-}
-
-// readJSONFile reads and parses the JSON file
-func readJSONFile(filePath string) (Report, error) {
-	var report Report
-
-	// Open the file
-	file, err := os.Open(filePath)
-	if err != nil {
-		return report, err
-	}
-	defer file.Close()
-
-	// Decode the JSON contents
-	err = json.NewDecoder(file).Decode(&report)
-	if err != nil {
-		return report, err
-	}
-
-	return report, nil
-}
-
-// writeJSONFile writes the JSON data to a file
-func writeJSONFile(filePath string, data interface{}) error {
-	// Create the file
-	file, err := os.Create(filePath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	// Encode the data as JSON and write to the file
-	err = json.NewEncoder(file).Encode(data)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func RemoveReports(filePaths []string) error {
@@ -160,6 +137,5 @@ func RemoveReports(filePaths []string) error {
 			return err
 		}
 	}
-
 	return nil
 }

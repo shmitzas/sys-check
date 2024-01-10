@@ -1,5 +1,5 @@
 ---
-- hosts: localhost
+- hosts: linux
   gather_facts: yes
   tasks:
     - name: Gather Linux machine file info

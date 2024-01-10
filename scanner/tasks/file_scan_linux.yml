@@ -1,7 +1,7 @@
 - name: Gather file info
   integrity_stats:
     directories:
-      # - /opt
+      - /opt
       # - /lib
       # - /lib64
       - /etc
@@ -9,8 +9,12 @@
       # - /bin
       # - /sbin
       # - /srv
-      # - /var
+      # - /home
+      - /var/www
+      - /var/local
+      - /var/snap
+      - /var/lib
       # - /root
-    service_host: "127.0.0.1"
+    service_host: "192.168.136.133"
     service_port: 6969
   become: true
