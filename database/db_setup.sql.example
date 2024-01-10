@@ -20,7 +20,7 @@ SELECT *
 FROM <database name>.files
 WHERE status='verified';
 
-CREATE MATERIALIZED VIEW <database name>.candidate AS
+CREATE MATERIALIZED VIEW <database name>.candidates AS
 SELECT *
 FROM <database name>.files
 WHERE status='candidate';
