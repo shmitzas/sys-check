@@ -20,6 +20,7 @@
     cd <cloned sys-check repository path>/scanner
     ```
 2. Configure `hosts` and `file_scan_linux.yml` files as per setup instructions
+- **NOTE: Target computers must have an ssh server (for example openssh-server) installed and running**
 3. Start scanner
     ```
     ansible-playbook osinfo.yml -i inventory/hosts
@@ -121,6 +122,10 @@
     - If you do not need any other authorization besides database's user use `trust`, otherwise use `md5` or other
     ```
     host    <database name>     <database user>     <specific IPv4 address>/32      trust
+    ```
+13. Restart main cluster to refresh configuration
+    ```
+    sudo systemctl restart postgresql@13-main
     ```
 
 ## Setup environment for uploading know file data
