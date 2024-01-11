@@ -76,7 +76,7 @@
     ```
 4. Go to environment configuration file location
     ```
-    cd /etc/sys_check
+    cd ~/.sys-check/.env/
     ```
 5. Fill out data in environment files.
 - Example of different type of data formats
@@ -178,7 +178,7 @@
     ```
 4. Go to environment configuration file location
     ```
-    cd /etc/sys_check
+    cd ~/.sys-check/.env/
     ```
 5. Fill out data in environment files.
 - Example of different type of data formats
@@ -195,21 +195,25 @@
     ```
     cd <cloned sys-check repository path>/scanner
     ```
-3. Create a copy of `hosts.example` and name it `hosts`
+3. Run environment setup script
+    ```
+    ./setup_env.sh
+    ```
+4. Create a copy of `hosts.example` and name it `hosts`
     ```
     cd inventory/
     ```
     ```
     cp hosts.example hosts
     ```
-4. Fill out `hosts` file with necessary data for remote access to target computers
-5. Go to tasks directory
+5. Fill out `hosts` file with necessary data for remote access to target computers
+6. Go to tasks directory
     ```
-    cd <cloned sys-check repository path>/scanner
+    cd <cloned sys-check repository path>/scanner/tasks
     ```
-6. Edit `file_scan_linux.yml` file
+7. Edit `file_scan_linux.yml` file
 - To configure what directories to scan edit `directories` list variable by adding or removing directories
-- To configure analyzer server's address edit `service_host` and `service_port` variables to match values defined at `/etc/sys_check/listener.env`
+- To configure analyzer server's address edit `service_host` and `service_port` variables to match values defined at `~/.sys_check/.env/listener.env`
 
 ## How to rebuild .go files after modifying them
 - To rebuild analyzer
