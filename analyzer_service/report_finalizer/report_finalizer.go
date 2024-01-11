@@ -45,7 +45,7 @@ func main() {
 		return
 	}
 
-	err := godotenv.Load("~/.sys-check/.env/report_finalizer.env")
+	err := godotenv.Load("/tmp/sys-check/.env/report_finalizer.env")
 	if err != nil {
 		log.Fatal("error loading .env file")
 	}

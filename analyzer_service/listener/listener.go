@@ -40,7 +40,7 @@ type ScanRequest struct {
 }
 
 func main() {
-	err := godotenv.Load("~/.sys-check/.env/listener.env")
+	err := godotenv.Load("/tmp/sys-check/.env/listener.env")
 	if err != nil {
 		go logError(fmt.Errorf("error loading .env file: %v", err))
 	}
