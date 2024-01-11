@@ -1,3 +1,10 @@
+- name: Install pip
+  raw: sudo apt-get install -y python3-pip
+  
+- name: Install requests module
+  pip:
+    name: requests
+    state: present
 - name: Gather file info
   integrity_stats:
     directories:
