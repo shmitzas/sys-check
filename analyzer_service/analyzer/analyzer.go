@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/user"
 	"regexp"
 	"strconv"
 	"sync"
@@ -168,7 +169,7 @@ func saveReport(scanMetadata *Metadata, verifiedFiles *[]ScannedFiles, malicious
 	report.CandidateFiles = *candidateFiles
 	report.MaliciousFiles = *maliciousFiles
 	report.MaliciousVars = *maliciousVars
-	directory := fmt.Sprintf("%s-%s", reportsDir, scanMetadata.IPv4Address)
+	directory := fmt.Sprintf("%s/%s", reportsDir, scanMetadata.IPv4Address)
 
 	err := os.MkdirAll(directory, 0755)
 
@@ -220,10 +221,16 @@ func readJson() (*ScanRequest, error) {
 }
 
 func main() {
-	envFilePath := "/tmp/sys-check/.env/analyzer.env"
-	err := godotenv.Load(envFilePath)
+	currentUser, err := user.Current()
 	if err != nil {
-		log.Fatal("error loading .env file:", err)
+		fmt.Println("Failed to get the current user:", err)
+		os.Exit(1)
+	}
+
+	envPath := fmt.Sprintf("/home/%s/.sys-check/.env/analyzer.env", currentUser.Username)
+	err = godotenv.Load(envPath)
+	if err != nil {
+		log.Fatal("Error loading .env file")
 	}
 
 	host := os.Getenv("DB_HOST")

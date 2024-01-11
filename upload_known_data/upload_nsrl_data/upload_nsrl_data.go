@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/user"
 	"strconv"
 	"strings"
 	"sync"
@@ -45,7 +46,14 @@ func main() {
 
 	filePath := os.Args[1]
 
-	err := godotenv.Load("/tmp/sys-check/.env/upload_data.env")
+	currentUser, err := user.Current()
+	if err != nil {
+		fmt.Println("Failed to get the current user:", err)
+		os.Exit(1)
+	}
+
+	envPath := fmt.Sprintf("/home/%s/.sys-check/.env/upload_data.env", currentUser.Username)
+	err = godotenv.Load(envPath)
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}

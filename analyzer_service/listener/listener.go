@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/user"
 
 	"github.com/joho/godotenv"
 )
@@ -40,9 +41,15 @@ type ScanRequest struct {
 }
 
 func main() {
-	err := godotenv.Load("/tmp/sys-check/.env/listener.env")
+	currentUser, err := user.Current()
 	if err != nil {
-		go logError(fmt.Errorf("error loading .env file: %v", err))
+		fmt.Println("Failed to get the current user:", err)
+		os.Exit(1)
+	}
+	envPath := fmt.Sprintf("/home/%s/.sys-check/.env/listener.env", currentUser.Username)
+	err = godotenv.Load(envPath)
+	if err != nil {
+		log.Fatal("Error loading .env file")
 	}
 
 	host := os.Getenv("HOST")

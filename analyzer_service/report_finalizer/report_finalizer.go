@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/user"
 	"path/filepath"
 
 	"github.com/joho/godotenv"
@@ -45,14 +46,21 @@ func main() {
 		return
 	}
 
-	err := godotenv.Load("/tmp/sys-check/.env/report_finalizer.env")
+	currentUser, err := user.Current()
 	if err != nil {
-		log.Fatal("error loading .env file")
+		fmt.Println("Failed to get the current user:", err)
+		os.Exit(1)
+	}
+
+	envPath := fmt.Sprintf("/home/%s/.sys-check/.env/report_finalizer.env", currentUser.Username)
+	err = godotenv.Load(envPath)
+	if err != nil {
+		log.Fatal("Error loading .env file")
 	}
 
 	metadata.IPv4Address = os.Args[1]
 	reportsDir := os.Getenv("REPORTS_DIR")
-	dirPath := fmt.Sprintf("%s-%s", reportsDir, metadata.IPv4Address)
+	dirPath := fmt.Sprintf("%s/%s", reportsDir, metadata.IPv4Address)
 
 	filePaths, err := findJSONFiles(dirPath)
 	if err != nil {

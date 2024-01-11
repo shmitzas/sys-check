@@ -12,7 +12,7 @@
     ```
     ./listener
     ```
-3. Target computer's file system's integrity report can be found at `<REPORTS_DIR>/reports-<target computer's ipv4 address>/final-report.json`
+3. Target computer's file system's integrity report can be found at `<REPORTS_DIR>/<target computer's ipv4 address>/final-report.json`
 
 ## Application for scanning target computers
 1. Navigate to the cloned repository's scanner directory
@@ -21,6 +21,7 @@
     ```
 2. Configure `hosts` and `file_scan_linux.yml` files as per setup instructions
 - **NOTE: Target computers must have an ssh server (for example openssh-server) installed and running**
+- **NOTE: Target computers ssh key's fingerprint must be in your `known_hosts` list**
 3. Start scanner
     ```
     ansible-playbook osinfo.yml -i inventory/hosts
@@ -76,14 +77,14 @@
     ```
 4. Go to environment configuration file location
     ```
-    cd /tmp/sys-check/.env/
+    cd /home/{user}/.sys-check/.env/
     ```
 5. Fill out data in environment files.
 - Example of different type of data formats
     - IPv4 address: `DB_HOST=127.0.0.1`
     - Port: `DB_PORT=5432`
     - `String` type variables: `DB_NAME=sys_check`
-    - File path: `REPORTS_DIR=/tmp/sys-check/reports`
+    - File path: `REPORTS_DIR=/home/{user}/.sys-check/reports`
 
 ## Setup Database server
 1. Clone this repository
@@ -115,7 +116,7 @@
     ```
     cd <cloned sys-check repository path>/database
     ```
-6. Copy database creation scripts to /tmp/
+6. Copy database creation scripts to /home/{user}/.
     ```
     cp db_setup.sql.example /tmp/db_setup.sql 
     ```
@@ -178,7 +179,7 @@
     ```
 4. Go to environment configuration file location
     ```
-    cd /tmp/sys-check/.env/
+    cd /home/{user}/.sys-check/.env/
     ```
 5. Fill out data in environment files.
 - Example of different type of data formats
@@ -213,7 +214,7 @@
     ```
 7. Edit `file_scan_linux.yml` file
 - To configure what directories to scan edit `directories` list variable by adding or removing directories
-- To configure analyzer server's address edit `service_host` and `service_port` variables to match values defined at `/tmp/sys-check/.env/listener.env`
+- To configure analyzer server's address edit `service_host` and `service_port` variables to match values defined at `/home/{user}/.sys-check/.env/listener.env`
 
 ## How to rebuild .go files after modifying them
 - To rebuild analyzer
