@@ -7,6 +7,7 @@ user=$(logname)
 mkdir "/home/${user}/.sys-check/"
 mkdir "/home/${user}/.sys-check/.env/"
 mkdir "/home/${user}/.sys-check/reports/"
+mkdir "/home/${user}/.sys-check/logs/"
 cp "${sys_check_repo_location}/analyzer_service/analyzer/.env.example" "/home/${user}/.sys-check/.env/analyzer.env"
 cp "${sys_check_repo_location}/analyzer_service/listener/.env.example" "/home/${user}/.sys-check/.env/listener.env"
 cp "${sys_check_repo_location}/analyzer_service/report_finalizer/.env.example" "/home/${user}/.sys-check/.env/report_finalizer.env"
