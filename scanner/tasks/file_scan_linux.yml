@@ -1,6 +1,6 @@
 - name: Install pip
   raw: sudo apt-get install -y python3-pip
-  
+
 - name: Install requests module
   pip:
     name: requests
@@ -9,19 +9,19 @@
   integrity_stats:
     directories:
       - /opt
-      # - /lib
-      # - /lib64
+      - /lib
+      - /lib64
       - /etc
-      # - /boot
-      # - /bin
-      # - /sbin
-      # - /srv
-      # - /home
+      - /boot
+      - /bin
+      - /sbin
+      - /srv
+      - /home
       - /var/www
       - /var/local
       - /var/snap
       - /var/lib
-      # - /root
+      - /root
     service_host: "127.0.0.1"
     service_port: 6060
   become: true
