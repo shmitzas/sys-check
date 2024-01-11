@@ -76,14 +76,14 @@
     ```
 4. Go to environment configuration file location
     ```
-    cd ~/.sys-check/.env/
+    cd /tmp/sys-check/.env/
     ```
 5. Fill out data in environment files.
 - Example of different type of data formats
     - IPv4 address: `DB_HOST=127.0.0.1`
     - Port: `DB_PORT=5432`
     - `String` type variables: `DB_NAME=sys_check`
-    - File path: `REPORTS_DIR=/tmp/sys_check/reports`
+    - File path: `REPORTS_DIR=/tmp/sys-check/reports`
 
 ## Setup Database server
 1. Clone this repository
@@ -178,7 +178,7 @@
     ```
 4. Go to environment configuration file location
     ```
-    cd ~/.sys-check/.env/
+    cd /tmp/sys-check/.env/
     ```
 5. Fill out data in environment files.
 - Example of different type of data formats
@@ -213,7 +213,7 @@
     ```
 7. Edit `file_scan_linux.yml` file
 - To configure what directories to scan edit `directories` list variable by adding or removing directories
-- To configure analyzer server's address edit `service_host` and `service_port` variables to match values defined at `~/.sys_check/.env/listener.env`
+- To configure analyzer server's address edit `service_host` and `service_port` variables to match values defined at `/tmp/sys-check/.env/listener.env`
 
 ## How to rebuild .go files after modifying them
 - To rebuild analyzer
